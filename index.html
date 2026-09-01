@@ -3,112 +3,172 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#0b0d12" />
+  <meta name="theme-color" content="#07090f" />
   <title>YouTube AI</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <div class="app-shell">
-    <header class="topbar">
-      <div>
-        <div class="eyebrow">PRIVATE CREATOR COMMAND CENTER</div>
-        <h1>YouTube AI</h1>
-      </div>
-      <div class="top-actions">
-        <span id="connectionBadge" class="badge">Checking backend…</span>
-        <button id="signOutBtn" class="ghost hidden">Sign out</button>
-      </div>
-    </header>
-
-    <nav class="tabs" aria-label="Main navigation">
-      <button class="tab active" data-view="home">Home</button>
-      <button class="tab" data-view="studio">Studio</button>
-      <button class="tab" data-view="videos">Videos</button>
-      <button class="tab" data-view="performance">Performance</button>
-    </nav>
-
-    <main>
-      <section id="authPanel" class="panel auth-panel">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-mark">Y</div>
         <div>
-          <div class="eyebrow">SIGN IN</div>
-          <h2>Connect your private workspace</h2>
-          <p class="muted">Enter your email. Supabase will send you a secure sign-in link. No password is stored in this app.</p>
+          <div class="eyebrow">CREATOR OS</div>
+          <div class="brand-name">YouTube AI</div>
         </div>
-        <form id="authForm" class="auth-form">
-          <input id="emailInput" type="email" autocomplete="email" placeholder="you@example.com" required />
-          <button class="primary" type="submit">Send sign-in link</button>
-        </form>
-        <p id="authMessage" class="status-line"></p>
-      </section>
+      </div>
 
-      <section id="appContent" class="hidden">
-        <section id="home" class="view active-view">
-          <div class="hero-grid">
-            <div class="panel hero-card">
-              <div class="eyebrow">TODAY</div>
-              <h2>Create original videos, then learn from the results.</h2>
-              <p class="muted">This dashboard only shows records that actually exist in your Supabase backend.</p>
-              <button class="primary" data-go="studio">Create Video</button>
-            </div>
-            <div class="metric-grid">
-              <article class="metric"><span>Projects</span><strong id="projectCount">0</strong></article>
-              <article class="metric"><span>Ready</span><strong id="readyCount">0</strong></article>
-              <article class="metric"><span>Posted</span><strong id="postedCount">0</strong></article>
-              <article class="metric"><span>Failed</span><strong id="failedCount">0</strong></article>
-            </div>
+      <nav class="tabs" aria-label="Main navigation">
+        <button class="tab active" data-view="home"><span class="tab-icon">⌂</span><span>Home</span></button>
+        <button class="tab" data-view="studio"><span class="tab-icon">✦</span><span>Studio</span></button>
+        <button class="tab" data-view="videos"><span class="tab-icon">▶</span><span>Videos</span></button>
+        <button class="tab" data-view="performance"><span class="tab-icon">↗</span><span>Performance</span></button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="system-card">
+          <span class="status-dot"></span>
+          <div>
+            <strong>System</strong>
+            <span id="connectionBadge">Checking backend…</span>
           </div>
+        </div>
+        <button id="signOutBtn" class="ghost full hidden">Sign out</button>
+      </div>
+    </aside>
 
-          <div class="grid-2">
-            <section class="panel">
-              <div class="section-head"><h3>Recent projects</h3><button class="ghost" data-go="videos">View all</button></div>
-              <div id="recentProjects" class="empty">No projects yet.</div>
-            </section>
-            <section class="panel">
-              <div class="section-head"><h3>YouTube connection</h3></div>
-              <div id="youtubeStatus" class="empty">Not connected.</div>
-              <div class="top-actions" style="margin-top:12px">
-                <button id="connectYouTubeBtn" class="primary" type="button">Connect YouTube</button>
+    <div class="workspace">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">PRIVATE CREATOR COMMAND CENTER</div>
+          <h1>Build. Publish. Learn.</h1>
+        </div>
+        <button class="primary compact" data-go="studio">+ Create Video</button>
+      </header>
+
+      <main>
+        <section id="authPanel" class="panel auth-panel">
+          <div class="auth-copy">
+            <div class="eyebrow">SECURE ACCESS</div>
+            <h2>Enter your creator workspace</h2>
+            <p class="muted">Sign in to access your real projects, YouTube connection, and performance data. No demo analytics are shown.</p>
+          </div>
+          <form id="authForm" class="auth-form">
+            <label class="field-label" for="emailInput">Email address</label>
+            <input id="emailInput" type="email" autocomplete="email" placeholder="you@example.com" required />
+            <button class="primary" type="submit">Send secure sign-in link</button>
+            <p id="authMessage" class="status-line"></p>
+          </form>
+        </section>
+
+        <section id="appContent" class="hidden">
+          <section id="home" class="view active-view">
+            <section class="hero-panel">
+              <div class="hero-copy">
+                <div class="eyebrow">TODAY'S WORKSPACE</div>
+                <h2>Turn strong ideas into videos people actually want to watch.</h2>
+                <p class="muted">Create original projects, connect your YouTube channel, and improve from real performance data.</p>
+                <div class="hero-actions">
+                  <button class="primary" data-go="studio">Create a video</button>
+                  <button class="ghost" data-go="videos">Open library</button>
+                </div>
               </div>
-              <p id="youtubeMessage" class="status-line"></p>
+              <div class="hero-orb" aria-hidden="true"><span>AI</span></div>
             </section>
-          </div>
-        </section>
 
-        <section id="studio" class="view">
-          <div class="panel">
-            <div class="eyebrow">STUDIO</div>
-            <h2>Start a real video project</h2>
-            <p class="muted">This creates a draft record in Supabase. Generation stays disabled until a real provider/render pipeline is connected.</p>
-            <form id="projectForm" class="form-grid">
-              <label>Title<input id="titleInput" required maxlength="140" placeholder="Video working title" /></label>
-              <label>Topic<input id="topicInput" maxlength="180" placeholder="What should the video be about?" /></label>
-              <label>Format<select id="formatInput"><option>Short</option><option>Long-form</option><option>Explainer</option><option>Story</option></select></label>
-              <label>Style<select id="styleInput"><option>Documentary</option><option>Hype</option><option>Mystery</option><option>News</option><option>Gaming</option><option>Storytime</option><option>Educational</option><option>Meme</option></select></label>
-              <label>Target length (seconds)<input id="durationInput" type="number" min="10" max="7200" value="45" /></label>
-              <div class="form-action"><button class="primary" type="submit">Create Draft</button></div>
-            </form>
-            <p id="projectMessage" class="status-line"></p>
-          </div>
-        </section>
+            <section class="metric-grid">
+              <article class="metric"><div class="metric-label">Projects</div><strong id="projectCount">0</strong><span>Total created</span></article>
+              <article class="metric"><div class="metric-label">Ready</div><strong id="readyCount">0</strong><span>Cleared to post</span></article>
+              <article class="metric"><div class="metric-label">Posted</div><strong id="postedCount">0</strong><span>Published videos</span></article>
+              <article class="metric"><div class="metric-label">Failed</div><strong id="failedCount">0</strong><span>Needs attention</span></article>
+            </section>
 
-        <section id="videos" class="view">
-          <div class="panel">
-            <div class="section-head"><div><div class="eyebrow">LIBRARY</div><h2>Your video projects</h2></div><button id="refreshBtn" class="ghost">Refresh</button></div>
-            <div id="projectList" class="empty">No projects yet.</div>
-          </div>
-        </section>
+            <div class="grid-2">
+              <section class="panel">
+                <div class="section-head">
+                  <div><div class="eyebrow">WORKFLOW</div><h3>Recent projects</h3></div>
+                  <button class="ghost compact" data-go="videos">View all</button>
+                </div>
+                <div id="recentProjects" class="empty">No projects yet.</div>
+              </section>
 
-        <section id="performance" class="view">
-          <div class="panel">
-            <div class="eyebrow">PERFORMANCE</div>
-            <h2>Real YouTube analytics only</h2>
-            <p class="muted">No demo numbers are shown. Analytics will appear after YouTube OAuth and data sync are connected.</p>
-            <div id="analyticsList" class="empty">No analytics snapshots yet.</div>
-          </div>
+              <section class="panel youtube-card">
+                <div class="section-head">
+                  <div><div class="eyebrow">CHANNEL</div><h3>YouTube connection</h3></div>
+                  <span class="youtube-chip">YouTube</span>
+                </div>
+                <div id="youtubeStatus" class="empty">Not connected.</div>
+                <button id="connectYouTubeBtn" class="primary full" type="button">Connect YouTube</button>
+                <p id="youtubeMessage" class="status-line"></p>
+              </section>
+            </div>
+          </section>
+
+          <section id="studio" class="view">
+            <div class="page-head">
+              <div><div class="eyebrow">STUDIO</div><h2>Create your next video</h2><p class="muted">Start with a real project record. Generation stays unavailable until a real generation pipeline is connected.</p></div>
+            </div>
+
+            <div class="studio-layout">
+              <section class="panel studio-main">
+                <form id="projectForm" class="form-grid">
+                  <label class="wide">Working title<input id="titleInput" required maxlength="140" placeholder="Give the project a clear title" /></label>
+                  <label class="wide">Topic or idea<textarea id="topicInput" maxlength="180" placeholder="What should this video be about?"></textarea></label>
+                  <label>Format<select id="formatInput"><option>Short</option><option>Long-form</option><option>Explainer</option><option>Story</option></select></label>
+                  <label>Style<select id="styleInput"><option>Documentary</option><option>Hype</option><option>Mystery</option><option>News</option><option>Gaming</option><option>Storytime</option><option>Educational</option><option>Meme</option></select></label>
+                  <label>Target length<input id="durationInput" type="number" min="10" max="7200" value="45" /><span class="input-help">Seconds</span></label>
+                  <div class="form-action wide"><button class="primary" type="submit">Create Draft</button></div>
+                </form>
+                <p id="projectMessage" class="status-line"></p>
+              </section>
+
+              <aside class="panel studio-side">
+                <div class="eyebrow">PIPELINE</div>
+                <h3>Creation flow</h3>
+                <div class="pipeline-list">
+                  <div class="pipeline-item active"><span>01</span><div><strong>Idea</strong><small>Topic, format, style</small></div></div>
+                  <div class="pipeline-item"><span>02</span><div><strong>Research</strong><small>Source-backed facts</small></div></div>
+                  <div class="pipeline-item"><span>03</span><div><strong>Script & voice</strong><small>Hook, narration, pacing</small></div></div>
+                  <div class="pipeline-item"><span>04</span><div><strong>Edit & QC</strong><small>Visuals, captions, checks</small></div></div>
+                  <div class="pipeline-item"><span>05</span><div><strong>Publish & learn</strong><small>Real YouTube results</small></div></div>
+                </div>
+              </aside>
+            </div>
+          </section>
+
+          <section id="videos" class="view">
+            <div class="page-head section-head">
+              <div><div class="eyebrow">LIBRARY</div><h2>Your video projects</h2><p class="muted">Every item below comes from your Supabase backend.</p></div>
+              <button id="refreshBtn" class="ghost compact">Refresh</button>
+            </div>
+            <div class="panel">
+              <div id="projectList" class="empty">No projects yet.</div>
+            </div>
+          </section>
+
+          <section id="performance" class="view">
+            <div class="page-head">
+              <div><div class="eyebrow">PERFORMANCE</div><h2>Real YouTube analytics</h2><p class="muted">No simulated numbers. Metrics appear only after YouTube OAuth and analytics sync are working.</p></div>
+            </div>
+            <div class="performance-banner">
+              <div><span class="status-dot"></span><strong>Live-data only</strong></div>
+              <span>Views · Watch time · Retention · Subscribers · Engagement</span>
+            </div>
+            <div class="panel">
+              <div id="analyticsList" class="empty">No analytics snapshots yet.</div>
+            </div>
+          </section>
         </section>
-      </section>
-    </main>
+      </main>
+
+      <nav class="mobile-nav" aria-label="Mobile navigation">
+        <button class="tab active" data-view="home"><span>⌂</span><small>Home</small></button>
+        <button class="tab" data-view="studio"><span>✦</span><small>Studio</small></button>
+        <button class="tab" data-view="videos"><span>▶</span><small>Videos</small></button>
+        <button class="tab" data-view="performance"><span>↗</span><small>Stats</small></button>
+      </nav>
+    </div>
   </div>
 
   <script type="module" src="./app.js"></script>
