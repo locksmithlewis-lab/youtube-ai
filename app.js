@@ -1,143 +1,51 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-const supabaseUrl = 'https://uqmnpeovwfzizajheuig.supabase.co';
-const supabaseKey = 'sb_publishable_W6N3YZeKf9iMSpQMt4Oukw_rmLfRTap';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseUrl='https://uqmnpeovwfzizajheuig.supabase.co';
+const supabaseKey='sb_publishable_W6N3YZeKf9iMSpQMt4Oukw_rmLfRTap';
+const supabase=createClient(supabaseUrl,supabaseKey);
+const $=id=>document.getElementById(id);
+const authPanel=$('authPanel'),appContent=$('appContent'),signOutBtn=$('signOutBtn'),connectionBadge=$('connectionBadge');
+let currentUser=null,projects=[],analytics=[],trends=[],selectedProjectId=null;
 
-const $ = (id) => document.getElementById(id);
-const authPanel = $('authPanel');
-const appContent = $('appContent');
-const signOutBtn = $('signOutBtn');
-const connectionBadge = $('connectionBadge');
-let currentUser = null;
-
-function setView(name){
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active-view'));
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===name));
-  $(name)?.classList.add('active-view');
-}
-
+function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+function setView(name){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active-view'));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===name));$(name)?.classList.add('active-view');}
 document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>setView(btn.dataset.view)));
 document.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>setView(btn.dataset.go)));
 
-async function refreshData(){
-  if(!currentUser) return;
-  connectionBadge.textContent='Supabase connected';
+function projectCard(p){return `<button class="project-row project-button ${selectedProjectId===p.id?'selected':''}" data-open-project="${p.id}"><div><div class="project-title">${escapeHtml(p.title)}</div><div class="project-meta">${escapeHtml(p.topic||'No topic')} · ${escapeHtml(p.format||'Unspecified')} · ${escapeHtml(p.style||'Unspecified')}</div></div><span class="status-pill">${escapeHtml(p.status)}</span>${p.failure_reason?`<div class="project-error">${escapeHtml(p.failure_reason)}</div>`:''}</button>`;}
+function renderTrends(){const el=$('trendList');if(!trends.length){el.className='cards-grid empty';el.textContent='No live trend signals saved yet.';return;}el.className='cards-grid';el.innerHTML=trends.slice(0,8).map(t=>`<article class="trend-card"><div class="trend-top"><strong>${escapeHtml(t.topic)}</strong><span>${t.score??'—'}</span></div><div class="project-meta">Freshness ${t.freshness??'—'} · ${escapeHtml(t.source)}</div><button class="ghost compact" data-use-trend="${encodeURIComponent(t.topic)}">Create from this</button></article>`).join('');}
+function renderHealth(yt){const completed=projects.some(p=>p.output_url);$('healthList').innerHTML=[['Supabase',true,'Authenticated database'],['YouTube',yt?.status==='connected',yt?.status==='connected'?'Channel connected':'Not connected'],['Trend Radar',yt?.status==='connected','Needs YouTube OAuth'],['Cloud renderer',completed,null]].map(([name,ok,detail])=>`<div class="health-row"><span class="health-dot ${ok?'ok':'warn'}"></span><div><strong>${name}</strong><small>${detail||'Worker installed; first successful render not seen yet'}</small></div></div>`).join('');}
+function renderLessons(){const box=$('lessonsList');if(!analytics.length){box.className='empty';box.textContent='Not enough real performance data yet.';return;}const latest=new Map();for(const a of analytics){if(!latest.has(a.project_id))latest.set(a.project_id,a);}const rows=[...latest.values()].filter(a=>a.project_id);if(!rows.length){box.className='empty';box.textContent='Analytics exist, but they are not linked to projects yet.';return;}rows.sort((a,b)=>(b.views||0)-(a.views||0));const best=rows[0],p=projects.find(x=>x.id===best.project_id);box.className='lesson-list';box.innerHTML=`<div class="lesson"><strong>Current top performer</strong><p>${escapeHtml(p?.title||best.youtube_video_id||'Video')} has ${Number(best.views||0).toLocaleString()} views in the latest stored snapshot${best.average_view_duration_seconds!=null?` and ${best.average_view_duration_seconds}s average view duration`:''}.</p></div><div class="lesson"><strong>Data standard</strong><p>Lessons only appear from stored YouTube snapshots; the app does not invent benchmark claims.</p></div>`;}
 
-  const [{data:projects,error:projectError},{data:yt,error:ytError},{data:analytics,error:analyticsError}] = await Promise.all([
-    supabase.from('video_projects').select('*').order('created_at',{ascending:false}),
-    supabase.from('youtube_connections').select('*').maybeSingle(),
-    supabase.from('analytics_snapshots').select('*').order('captured_at',{ascending:false}).limit(20)
-  ]);
+async function refreshData(){if(!currentUser)return;connectionBadge.textContent='Supabase connected';const [pRes,yRes,aRes,tRes]=await Promise.all([supabase.from('video_projects').select('*').order('created_at',{ascending:false}),supabase.from('youtube_connections').select('*').maybeSingle(),supabase.from('analytics_snapshots').select('*').order('captured_at',{ascending:false}).limit(50),supabase.from('trend_signals').select('*').order('observed_at',{ascending:false}).limit(20)]);if(pRes.error){connectionBadge.textContent='Backend read error';console.error(pRes.error);return;}projects=pRes.data||[];analytics=aRes.data||[];trends=tRes.data||[];$('projectCount').textContent=projects.length;$('readyCount').textContent=projects.filter(p=>p.status==='ready').length;$('postedCount').textContent=projects.filter(p=>p.status==='posted').length;$('failedCount').textContent=projects.filter(p=>p.status==='failed').length;$('recentProjects').innerHTML=projects.length?projects.slice(0,4).map(p=>`<div class="project-row"><div class="project-title">${escapeHtml(p.title)}</div><div class="project-meta">${escapeHtml(p.topic||'No topic')} · ${escapeHtml(p.status)}</div></div>`).join(''):'No projects yet.';$('projectList').className=projects.length?'project-list':'empty';$('projectList').innerHTML=projects.length?projects.map(projectCard).join(''):'No projects yet.';if(yRes.error){$('youtubeStatus').textContent='Could not read YouTube connection state.';}else if(!yRes.data||yRes.data.status!=='connected'){$('youtubeStatus').textContent='Not connected.';$('connectYouTubeBtn').textContent='Connect YouTube';}else{$('youtubeStatus').innerHTML=`Connected to <strong>${escapeHtml(yRes.data.channel_title||yRes.data.channel_id||'YouTube channel')}</strong>. Last sync: ${yRes.data.last_sync_at?new Date(yRes.data.last_sync_at).toLocaleString():'not synced yet'}.`;$('connectYouTubeBtn').textContent='Reconnect YouTube';}if(aRes.error){$('analyticsList').textContent='Could not read analytics snapshots.';}else if(!analytics.length){$('analyticsList').textContent='No analytics snapshots yet.';}else{$('analyticsList').innerHTML=analytics.map(a=>`<div class="project-row"><div class="project-title">${escapeHtml(a.youtube_video_id||'Channel snapshot')}</div><div class="project-meta">Captured ${new Date(a.captured_at).toLocaleString()}</div><div class="analytics-mini"><span>Views ${a.views??'—'}</span><span>Avg duration ${a.average_view_duration_seconds??'—'}s</span><span>Likes ${a.likes??'—'}</span></div></div>`).join('');}renderTrends();renderHealth(yRes.data);renderLessons();if(selectedProjectId&&projects.some(p=>p.id===selectedProjectId))await openProject(selectedProjectId);}
 
-  if(projectError){ connectionBadge.textContent='Backend read error'; console.error(projectError); return; }
+async function applySession(session){currentUser=session?.user||null;authPanel.classList.toggle('hidden',!!currentUser);appContent.classList.toggle('hidden',!currentUser);signOutBtn.classList.toggle('hidden',!currentUser);if(currentUser)await refreshData();else connectionBadge.textContent='Supabase ready';}
 
-  const items = projects || [];
-  $('projectCount').textContent=items.length;
-  $('readyCount').textContent=items.filter(p=>p.status==='ready').length;
-  $('postedCount').textContent=items.filter(p=>p.status==='posted').length;
-  $('failedCount').textContent=items.filter(p=>p.status==='failed').length;
-
-  const renderProject = p => `<div class="project-row"><div class="project-title">${escapeHtml(p.title)}</div><div class="project-meta">${escapeHtml(p.topic||'No topic yet')} · ${escapeHtml(p.format||'Unspecified')} · ${escapeHtml(p.style||'Unspecified')}</div><span class="status-pill">${escapeHtml(p.status)}</span>${p.failure_reason?`<div class="project-meta">Failure: ${escapeHtml(p.failure_reason)}</div>`:''}</div>`;
-  $('recentProjects').innerHTML = items.length ? items.slice(0,4).map(renderProject).join('') : 'No projects yet.';
-  $('projectList').innerHTML = items.length ? items.map(renderProject).join('') : 'No projects yet.';
-
-  if(ytError){
-    $('youtubeStatus').textContent='Could not read YouTube connection state.';
-  } else if(!yt || yt.status!=='connected'){
-    $('youtubeStatus').textContent='Not connected.';
-    $('connectYouTubeBtn').textContent='Connect YouTube';
-  } else {
-    $('youtubeStatus').innerHTML=`Connected to <strong>${escapeHtml(yt.channel_title||yt.channel_id||'YouTube channel')}</strong>. Last sync: ${yt.last_sync_at?new Date(yt.last_sync_at).toLocaleString():'not synced yet'}.`;
-    $('connectYouTubeBtn').textContent='Reconnect YouTube';
-  }
-
-  if(analyticsError){
-    $('analyticsList').textContent='Could not read analytics snapshots.';
-  } else if(!analytics?.length){
-    $('analyticsList').textContent='No analytics snapshots yet.';
-  } else {
-    $('analyticsList').innerHTML=analytics.map(a=>`<div class="project-row"><div><div class="project-title">${escapeHtml(a.youtube_video_id||'Channel snapshot')}</div><div class="project-meta">Captured ${new Date(a.captured_at).toLocaleString()}</div></div><div>Views: ${a.views ?? '—'}</div><div>Avg duration: ${a.average_view_duration_seconds ?? '—'}s</div></div>`).join('');
-  }
-}
-
-function escapeHtml(value){return String(value).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
-
-async function applySession(session){
-  currentUser=session?.user||null;
-  authPanel.classList.toggle('hidden',!!currentUser);
-  appContent.classList.toggle('hidden',!currentUser);
-  signOutBtn.classList.toggle('hidden',!currentUser);
-  if(currentUser) await refreshData(); else connectionBadge.textContent='Supabase ready';
-}
-
-$('authForm').addEventListener('submit',async e=>{
-  e.preventDefault();
-  $('authMessage').textContent='Sending secure link…';
-  const email=$('emailInput').value.trim();
-  const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}});
-  $('authMessage').textContent=error?error.message:'Check your email for the sign-in link.';
-});
-
-$('connectYouTubeBtn').addEventListener('click', async ()=>{
-  $('youtubeMessage').textContent='Starting secure YouTube connection…';
-  const {data:{session}}=await supabase.auth.getSession();
-  if(!session?.access_token){
-    $('youtubeMessage').textContent='Sign in to the app first.';
-    return;
-  }
-  try{
-    const response=await fetch('/api/youtube-start',{
-      method:'POST',
-      headers:{Authorization:`Bearer ${session.access_token}`}
-    });
-    const body=await response.json().catch(()=>({}));
-    if(!response.ok || !body.url){
-      $('youtubeMessage').textContent=body.error||'YouTube OAuth is not configured yet.';
-      return;
-    }
-    window.location.assign(body.url);
-  }catch(error){
-    $('youtubeMessage').textContent='Could not start YouTube connection.';
-    console.error(error);
-  }
-});
-
+$('googleSignInBtn').addEventListener('click',async()=>{ $('authMessage').textContent='Opening Google sign-in…';const {error}=await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin}});if(error)$('authMessage').textContent=error.message;});
+$('authForm').addEventListener('submit',async e=>{e.preventDefault();$('authMessage').textContent='Sending secure link…';const email=$('emailInput').value.trim();const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}});$('authMessage').textContent=error?error.message:'Check your email for the newest sign-in link.';});
 signOutBtn.addEventListener('click',async()=>{await supabase.auth.signOut();});
+
+$('connectYouTubeBtn').addEventListener('click',async()=>{ $('youtubeMessage').textContent='Starting secure YouTube connection…';const {data:{session}}=await supabase.auth.getSession();if(!session?.access_token){$('youtubeMessage').textContent='Sign in first.';return;}try{const r=await fetch('/api/youtube-start',{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`}});const b=await r.json().catch(()=>({}));if(!r.ok||!b.url){$('youtubeMessage').textContent=b.error||'YouTube OAuth is not configured yet.';return;}window.location.assign(b.url);}catch(e){$('youtubeMessage').textContent='Could not start YouTube connection.';console.error(e);}});
+
+$('refreshTrendsBtn').addEventListener('click',async()=>{const btn=$('refreshTrendsBtn');btn.disabled=true;$('trendMessage').textContent='Reading live YouTube trends…';const {data:{session}}=await supabase.auth.getSession();try{const r=await fetch('/api/trends',{method:'POST',headers:{Authorization:`Bearer ${session?.access_token||''}`}});const b=await r.json();if(!r.ok)throw new Error(b.error||'Trend refresh failed.');trends=b.trends||[];renderTrends();$('trendMessage').textContent=`Updated ${trends.length} real trend signals.`;}catch(e){$('trendMessage').textContent=e.message;}finally{btn.disabled=false;}});
+
+document.addEventListener('click',e=>{const trendBtn=e.target.closest('[data-use-trend]');if(trendBtn){$('topicInput').value=decodeURIComponent(trendBtn.dataset.useTrend);$('titleInput').value=decodeURIComponent(trendBtn.dataset.useTrend).slice(0,140);setView('studio');}const projectBtn=e.target.closest('[data-open-project]');if(projectBtn){selectedProjectId=projectBtn.dataset.openProject;openProject(selectedProjectId);document.querySelectorAll('[data-open-project]').forEach(b=>b.classList.toggle('selected',b.dataset.openProject===selectedProjectId));}});
+
+$('projectForm').addEventListener('submit',async e=>{e.preventDefault();if(!currentUser)return;$('projectMessage').textContent='Creating project…';const payload={user_id:currentUser.id,title:$('titleInput').value.trim(),topic:$('topicInput').value.trim()||null,format:$('formatInput').value,style:$('styleInput').value,target_duration_seconds:Number($('durationInput').value)||null,status:'draft'};const {data,error}=await supabase.from('video_projects').insert(payload).select().single();if(error){$('projectMessage').textContent=`Could not create project: ${error.message}`;return;}const steps=['research','script','voice','visuals','edit','quality_check','ready'].map(step=>({user_id:currentUser.id,project_id:data.id,step,status:'pending'}));await supabase.from('project_pipeline_steps').insert(steps);$('projectMessage').textContent='Project created.';e.target.reset();$('durationInput').value='45';selectedProjectId=data.id;await refreshData();setView('videos');});
 $('refreshBtn').addEventListener('click',refreshData);
 
-$('projectForm').addEventListener('submit',async e=>{
-  e.preventDefault();
-  if(!currentUser) return;
-  $('projectMessage').textContent='Creating draft…';
-  const duration=Number($('durationInput').value)||null;
-  const payload={
-    user_id:currentUser.id,
-    title:$('titleInput').value.trim(),
-    topic:$('topicInput').value.trim()||null,
-    format:$('formatInput').value,
-    style:$('styleInput').value,
-    target_duration_seconds:duration,
-    status:'draft'
-  };
-  const {error}=await supabase.from('video_projects').insert(payload);
-  if(error){ $('projectMessage').textContent=`Could not create draft: ${error.message}`; return; }
-  $('projectMessage').textContent='Draft created in Supabase.';
-  e.target.reset();
-  $('durationInput').value='45';
-  await refreshData();
-  setView('videos');
-});
+async function openProject(id){const p=projects.find(x=>x.id===id);if(!p)return;selectedProjectId=id;const [sourcesRes,hooksRes,stepsRes,checkRes,rendersRes]=await Promise.all([supabase.from('research_sources').select('*').eq('project_id',id).order('created_at'),supabase.from('hook_variants').select('*').eq('project_id',id).order('created_at'),supabase.from('project_pipeline_steps').select('*').eq('project_id',id),supabase.from('publish_checklist_items').select('*').eq('project_id',id),supabase.from('render_jobs').select('*').eq('project_id',id).order('created_at',{ascending:false}).limit(3)]);const sources=sourcesRes.data||[],hooks=hooksRes.data||[],steps=stepsRes.data||[],checks=checkRes.data||[],renders=rendersRes.data||[];let signedUrl=null;if(p.output_url){const {data}=await supabase.storage.from('video-outputs').createSignedUrl(p.output_url,3600);signedUrl=data?.signedUrl||null;}const pipelineOrder=['research','script','voice','visuals','edit','quality_check','ready'];const stepHtml=pipelineOrder.map(name=>{const s=steps.find(x=>x.step===name);return `<div class="mini-step ${escapeHtml(s?.status||'pending')}"><strong>${name.replace('_',' ')}</strong><span>${escapeHtml(s?.status||'pending')}</span>${s?.detail?`<small>${escapeHtml(s.detail)}</small>`:''}</div>`}).join('');const checklist=['title','description','thumbnail','captions','quality','copyright','visibility','approval'];const checklistHtml=checklist.map(item=>{const row=checks.find(x=>x.item===item);return `<label class="check-row"><input type="checkbox" data-check-item="${item}" ${row?.checked?'checked':''}/><span>${item.replace('_',' ')}</span></label>`}).join('');$('projectWorkspace').innerHTML=`<div class="workspace-head"><div><div class="eyebrow">PROJECT</div><h2>${escapeHtml(p.title)}</h2><p class="muted">${escapeHtml(p.topic||'No topic')}</p></div><span class="status-pill">${escapeHtml(p.status)}</span></div><div class="pipeline-strip">${stepHtml}</div><div class="work-grid"><section class="work-card"><div class="eyebrow">RESEARCH + SOURCES</div><h3>Evidence before scripting</h3><div id="sourceList">${sources.length?sources.map(s=>`<div class="source-row"><div><strong>${escapeHtml(s.title)}</strong><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">Open source</a>${s.claim?`<small>${escapeHtml(s.claim)}</small>`:''}</div><span class="status-pill">${s.verified?'verified':'unverified'}</span></div>`).join(''):'<div class="empty compact-empty">No sources yet.</div>'}</div><form id="sourceForm" class="stack compact-form"><input id="sourceTitle" placeholder="Source title" required/><input id="sourceUrl" type="url" placeholder="https://…" required/><input id="sourceClaim" placeholder="Claim this source supports"/><label class="check-row"><input id="sourceVerified" type="checkbox"/> I checked this source</label><button class="ghost compact">Add source</button></form></section><section class="work-card"><div class="eyebrow">HOOK LAB</div><h3>Choose the opening</h3><div id="hookList">${hooks.length?hooks.map(h=>`<label class="hook-row"><input type="radio" name="selectedHook" data-hook-id="${h.id}" ${h.selected?'checked':''}/><span>${escapeHtml(h.hook)}</span></label>`).join(''):'<div class="empty compact-empty">No hooks yet.</div>'}</div><form id="hookForm" class="stack compact-form"><textarea id="hookText" placeholder="Add a hook variant" required></textarea><button class="ghost compact">Add hook</button></form></section><section class="work-card wide-card"><div class="eyebrow">SCRIPT</div><h3>Narration</h3><textarea id="scriptEditor" class="big-editor" placeholder="Write or paste the finished narration here.">${escapeHtml(p.script||'')}</textarea><div class="inline-actions"><button id="saveScriptBtn" class="ghost compact">Save script</button><button id="queueRenderBtn" class="primary compact">Queue cloud render</button></div><p id="workspaceMessage" class="status-line"></p></section><section class="work-card"><div class="eyebrow">VIDEO PREVIEW</div><h3>Finished render</h3>${signedUrl?`<video class="video-preview" controls playsinline src="${signedUrl}"></video>`:'<div class="empty compact-empty">No finished MP4 yet.</div>'}<div class="render-history">${renders.map(r=>`<div class="project-meta">${new Date(r.created_at).toLocaleString()} · ${escapeHtml(r.engine)} · ${escapeHtml(r.status)}${r.error?` · ${escapeHtml(r.error)}`:''}</div>`).join('')}</div></section><section class="work-card"><div class="eyebrow">QUALITY GATE</div><h3>Block weak/incomplete output</h3><p class="muted small">Current gate checks only facts the app can prove: verified research, selected hook, saved script, and a finished render.</p><button id="runQualityBtn" class="primary compact">Run quality gate</button><div id="qualityResult" class="status-line"></div></section><section class="work-card wide-card"><div class="eyebrow">PUBLISHING CHECKLIST</div><h3>Human approval before upload</h3><div class="check-grid">${checklistHtml}</div><p class="muted small">These are explicit confirmations, not automated claims. Direct YouTube upload will remain separate until upload scope is added.</p></section></div>`;
 
-const params=new URLSearchParams(window.location.search);
-if(params.get('youtube')==='connected'){
-  $('youtubeMessage').textContent='YouTube connected successfully.';
-  history.replaceState({},'',window.location.pathname);
-}else if(params.get('youtube')==='denied'){
-  $('youtubeMessage').textContent='YouTube connection was cancelled.';
-  history.replaceState({},'',window.location.pathname);
+$('sourceForm').addEventListener('submit',async e=>{e.preventDefault();const {error}=await supabase.from('research_sources').insert({user_id:currentUser.id,project_id:id,title:$('sourceTitle').value.trim(),url:$('sourceUrl').value.trim(),claim:$('sourceClaim').value.trim()||null,verified:$('sourceVerified').checked});if(!error){await setStep(id,'research',$('sourceVerified').checked?'passed':'running','Research source added.');await openProject(id);}});
+$('hookForm').addEventListener('submit',async e=>{e.preventDefault();const {error}=await supabase.from('hook_variants').insert({user_id:currentUser.id,project_id:id,hook:$('hookText').value.trim(),selected:false});if(!error)await openProject(id);});
+document.querySelectorAll('[data-hook-id]').forEach(r=>r.addEventListener('change',async()=>{await supabase.from('hook_variants').update({selected:false}).eq('project_id',id);await supabase.from('hook_variants').update({selected:true}).eq('id',r.dataset.hookId);const chosen=hooks.find(h=>h.id===r.dataset.hookId);await supabase.from('video_projects').update({hook:chosen?.hook||null,updated_at:new Date().toISOString()}).eq('id',id);await openProject(id);}));
+$('saveScriptBtn').addEventListener('click',async()=>{const script=$('scriptEditor').value.trim();const {error}=await supabase.from('video_projects').update({script,updated_at:new Date().toISOString()}).eq('id',id);if(error){$('workspaceMessage').textContent=error.message;return;}await setStep(id,'script',script?'passed':'pending',script?'Script saved.':null);$('workspaceMessage').textContent='Script saved.';await refreshData();});
+$('queueRenderBtn').addEventListener('click',async()=>{const script=$('scriptEditor').value.trim();if(!script){$('workspaceMessage').textContent='Save a script before rendering.';return;}await supabase.from('video_projects').update({script,status:'generating',failure_reason:null,updated_at:new Date().toISOString()}).eq('id',id);await setStep(id,'voice','running','Queued for cloud renderer.');await setStep(id,'visuals','running','Queued for cloud renderer.');await setStep(id,'edit','running','Queued for cloud renderer.');const {error}=await supabase.from('render_jobs').insert({user_id:currentUser.id,project_id:id,status:'queued'});$('workspaceMessage').textContent=error?error.message:'Render queued. The GitHub cloud worker checks the queue every 5 minutes.';await refreshData();});
+$('runQualityBtn').addEventListener('click',async()=>{const current=projects.find(x=>x.id===id)||p;const reasons=[];if(!sources.some(s=>s.verified))reasons.push('No verified research source.');if(!hooks.some(h=>h.selected))reasons.push('No hook selected.');if(!(current.script||$('scriptEditor').value.trim()))reasons.push('No saved script.');if(!current.output_url)reasons.push('No finished MP4 render.');const passed=!reasons.length;await supabase.from('quality_checks').insert({user_id:currentUser.id,project_id:id,score:null,passed,evidence:{verified_sources:sources.filter(s=>s.verified).length,selected_hook:hooks.some(h=>h.selected),script_present:!!(current.script||$('scriptEditor').value.trim()),render_present:!!current.output_url},rejection_reasons:reasons,reviewer_version:'deterministic-gate-v1'});await supabase.from('video_projects').update({status:passed?'ready':'quality_check',failure_reason:passed?null:reasons.join(' '),updated_at:new Date().toISOString()}).eq('id',id);await setStep(id,'quality_check',passed?'passed':'failed',passed?'Required evidence present.':reasons.join(' '));await setStep(id,'ready',passed?'passed':'blocked',passed?'Ready for human publishing approval.':'Quality gate did not pass.');$('qualityResult').textContent=passed?'Passed. Project is Ready.':`Blocked: ${reasons.join(' ')}`;await refreshData();});
+document.querySelectorAll('[data-check-item]').forEach(cb=>cb.addEventListener('change',async()=>{await supabase.from('publish_checklist_items').upsert({user_id:currentUser.id,project_id:id,item:cb.dataset.checkItem,checked:cb.checked,updated_at:new Date().toISOString()},{onConflict:'project_id,item'});}));
 }
 
-supabase.auth.onAuthStateChange((_event,session)=>applySession(session));
-const {data:{session}}=await supabase.auth.getSession();
-await applySession(session);
+async function setStep(projectId,step,status,detail=null){await supabase.from('project_pipeline_steps').upsert({user_id:currentUser.id,project_id:projectId,step,status,detail,updated_at:new Date().toISOString()},{onConflict:'project_id,step'});}
+
+const params=new URLSearchParams(window.location.search);if(params.get('youtube')==='connected'){$('youtubeMessage').textContent='YouTube connected successfully.';history.replaceState({},'',window.location.pathname);}else if(params.get('youtube')==='denied'){$('youtubeMessage').textContent='YouTube connection was cancelled.';history.replaceState({},'',window.location.pathname);}else if(params.get('youtube')==='error'){$('youtubeMessage').textContent='YouTube connection failed. Check configuration or reconnect.';history.replaceState({},'',window.location.pathname);}
+supabase.auth.onAuthStateChange((_event,session)=>applySession(session));const {data:{session}}=await supabase.auth.getSession();await applySession(session);
