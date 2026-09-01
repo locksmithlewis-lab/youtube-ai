@@ -11,14 +11,21 @@ function sign(payload, secret) {
   return crypto.createHmac('sha256', secret).update(payload).digest('base64url');
 }
 
+function looksLikeGoogleWebClientId(value) {
+  return /^\d+-[a-z0-9_-]+\.apps\.googleusercontent\.com$/i.test(String(value || '').trim());
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
   const stateSecret = process.env.YOUTUBE_OAUTH_STATE_SECRET;
   const appUrl = process.env.APP_URL;
   if (!clientId || !stateSecret || !appUrl) {
     return res.status(503).json({ error: 'YouTube OAuth is not configured yet.' });
+  }
+  if (!looksLikeGoogleWebClientId(clientId)) {
+    return res.status(503).json({ error: 'GOOGLE_CLIENT_ID is invalid. In Vercel, use the Web application OAuth Client ID ending in .apps.googleusercontent.com — not the client secret, API key, or Supabase client ID.' });
   }
 
   const auth = req.headers.authorization || '';
