@@ -36,7 +36,7 @@
 
       <section id="appContent" class="hidden">
         <section id="home" class="view active-view">
-          <section class="hero-panel"><div class="hero-copy"><div class="eyebrow">TODAY'S WORKSPACE</div><h2>Find a strong idea. Make the video. Learn from reality.</h2><p class="muted">Trend signals, project status, quality gates, publishing readiness, and actual performance live in one workflow.</p><div class="hero-actions"><button class="primary" data-go="studio">Create a video</button><button class="ghost" data-go="videos">Open library</button></div></div><div class="hero-orb" aria-hidden="true"><span>AI</span></div></section>
+          <section class="hero-panel"><div class="hero-copy"><div class="eyebrow">TODAY'S WORKSPACE</div><h2>Find a strong idea. Make the video. Learn from reality.</h2><p class="muted">Trend signals, project status, quality gates, publishing readiness, and actual performance live in one workflow.</p><div class="hero-actions"><button class="primary" id="quickGenerateBtn" type="button">⚡ Quick Generate Viral-Style Short</button><button class="ghost" data-go="studio">Create manually</button><button class="ghost" data-go="videos">Open library</button></div><p id="quickGenerateMessage" class="status-line"></p></div><div class="hero-orb" aria-hidden="true"><span>AI</span></div></section>
 
           <section class="metric-grid"><article class="metric"><div class="metric-label">Projects</div><strong id="projectCount">0</strong><span>Total created</span></article><article class="metric"><div class="metric-label">Ready</div><strong id="readyCount">0</strong><span>Passed quality gate</span></article><article class="metric"><div class="metric-label">Posted</div><strong id="postedCount">0</strong><span>Published videos</span></article><article class="metric"><div class="metric-label">Failed</div><strong id="failedCount">0</strong><span>Needs attention</span></article></section>
 
@@ -78,5 +78,6 @@
   </div>
 </div>
 <script type="module" src="./app.js"></script>
+<script type="module" src="./quick-generate.js"></script>
 </body>
 </html>
