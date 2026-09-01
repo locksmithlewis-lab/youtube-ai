@@ -45,9 +45,11 @@ async function refreshData(){
   if(ytError){
     $('youtubeStatus').textContent='Could not read YouTube connection state.';
   } else if(!yt || yt.status!=='connected'){
-    $('youtubeStatus').textContent='Not connected. YouTube OAuth is the next backend feature to enable.';
+    $('youtubeStatus').textContent='Not connected.';
+    $('connectYouTubeBtn').textContent='Connect YouTube';
   } else {
     $('youtubeStatus').innerHTML=`Connected to <strong>${escapeHtml(yt.channel_title||yt.channel_id||'YouTube channel')}</strong>. Last sync: ${yt.last_sync_at?new Date(yt.last_sync_at).toLocaleString():'not synced yet'}.`;
+    $('connectYouTubeBtn').textContent='Reconnect YouTube';
   }
 
   if(analyticsError){
@@ -77,6 +79,30 @@ $('authForm').addEventListener('submit',async e=>{
   $('authMessage').textContent=error?error.message:'Check your email for the sign-in link.';
 });
 
+$('connectYouTubeBtn').addEventListener('click', async ()=>{
+  $('youtubeMessage').textContent='Starting secure YouTube connection…';
+  const {data:{session}}=await supabase.auth.getSession();
+  if(!session?.access_token){
+    $('youtubeMessage').textContent='Sign in to the app first.';
+    return;
+  }
+  try{
+    const response=await fetch('/api/youtube-start',{
+      method:'POST',
+      headers:{Authorization:`Bearer ${session.access_token}`}
+    });
+    const body=await response.json().catch(()=>({}));
+    if(!response.ok || !body.url){
+      $('youtubeMessage').textContent=body.error||'YouTube OAuth is not configured yet.';
+      return;
+    }
+    window.location.assign(body.url);
+  }catch(error){
+    $('youtubeMessage').textContent='Could not start YouTube connection.';
+    console.error(error);
+  }
+});
+
 signOutBtn.addEventListener('click',async()=>{await supabase.auth.signOut();});
 $('refreshBtn').addEventListener('click',refreshData);
 
@@ -102,6 +128,15 @@ $('projectForm').addEventListener('submit',async e=>{
   await refreshData();
   setView('videos');
 });
+
+const params=new URLSearchParams(window.location.search);
+if(params.get('youtube')==='connected'){
+  $('youtubeMessage').textContent='YouTube connected successfully.';
+  history.replaceState({},'',window.location.pathname);
+}else if(params.get('youtube')==='denied'){
+  $('youtubeMessage').textContent='YouTube connection was cancelled.';
+  history.replaceState({},'',window.location.pathname);
+}
 
 supabase.auth.onAuthStateChange((_event,session)=>applySession(session));
 const {data:{session}}=await supabase.auth.getSession();
