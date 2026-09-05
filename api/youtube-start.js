@@ -59,6 +59,7 @@ module.exports = async function handler(req, res) {
     include_granted_scopes: 'true',
     scope: [
       'https://www.googleapis.com/auth/youtube.readonly',
+      'https://www.googleapis.com/auth/youtube.upload',
       'https://www.googleapis.com/auth/yt-analytics.readonly',
     ].join(' '),
     state,
