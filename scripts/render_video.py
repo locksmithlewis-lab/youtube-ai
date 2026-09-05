@@ -1,6 +1,6 @@
-import json, math, os, re, subprocess, urllib.parse, urllib.request
+import json, math, os, re, subprocess, urllib.error, urllib.parse, urllib.request
 from pathlib import Path
-SUPABASE_URL=os.environ.get('SUPABASE_URL','').rstrip('/'); SERVICE_KEY=os.environ.get('SUPABASE_SERVICE_ROLE_KEY',''); PEXELS_API_KEY=os.environ.get('PEXELS_API_KEY',''); ENGINE='rolixa-cinematic-renderer-v5-qc'; VOICE_MODEL=os.environ.get('PIPER_VOICE','en_US-lessac-medium'); VOICE_DIR=Path(os.environ.get('PIPER_VOICE_DIR','.piper-voices'))
+SUPABASE_URL=os.environ.get('SUPABASE_URL','').rstrip('/'); SERVICE_KEY=os.environ.get('SUPABASE_SERVICE_ROLE_KEY',''); PEXELS_API_KEY=os.environ.get('PEXELS_API_KEY','').strip(); ENGINE='rolixa-cinematic-renderer-v5-qc'; VOICE_MODEL=os.environ.get('PIPER_VOICE','en_US-lessac-medium'); VOICE_DIR=Path(os.environ.get('PIPER_VOICE_DIR','.piper-voices'))
 if not SUPABASE_URL or not SERVICE_KEY: raise SystemExit('Supabase secrets required.')
 HEADERS={'apikey':SERVICE_KEY,'Authorization':f'Bearer {SERVICE_KEY}','Content-Type':'application/json'}
 def request(method,path,data=None,extra=None):
@@ -31,9 +31,14 @@ def shot_plan(project,copy,count):
   plans.append({'type':kind,'query':f'{q} {kind} cinematic','motion':['push','drift-left','pull','drift-right','push-soft'][i%5]})
  return plans
 def pexels_candidates(q,orientation='portrait'):
- if not PEXELS_API_KEY:return []
- url='https://api.pexels.com/v1/videos/search?'+urllib.parse.urlencode({'query':q,'per_page':15,'orientation':orientation,'size':'medium'}); req=urllib.request.Request(url,headers={'Authorization':PEXELS_API_KEY})
- with urllib.request.urlopen(req,timeout=30) as r:data=json.loads(r.read().decode())
+ if not PEXELS_API_KEY: raise RuntimeError('Pexels API key is missing from the render worker.')
+ url='https://api.pexels.com/v1/videos/search?'+urllib.parse.urlencode({'query':q,'per_page':15,'orientation':orientation,'size':'medium'})
+ req=urllib.request.Request(url,headers={'Authorization':PEXELS_API_KEY,'Accept':'application/json','User-Agent':'Rolixa/1.0'})
+ try:
+  with urllib.request.urlopen(req,timeout=30) as r:data=json.loads(r.read().decode())
+ except urllib.error.HTTPError as e:
+  body=e.read().decode('utf-8','replace')[:300]
+  raise RuntimeError(f'Pexels API returned HTTP {e.code}: {body or e.reason}') from e
  out=[]
  for v in data.get('videos') or []:
   fs=sorted(v.get('video_files') or [],key=lambda x:(x.get('width') or 0)*(x.get('height') or 0),reverse=True)
@@ -72,9 +77,9 @@ try:
  with (work/'script.txt').open() as src:run(['piper','--model',str(model),'--output_file',str(raw),'--length-scale','0.94'],stdin=src)
  audio=work/'voice.wav';run(['ffmpeg','-y','-i',str(raw),'-af','highpass=f=70,lowpass=f=14000,acompressor=threshold=-18dB:ratio=2:attack=8:release=160,equalizer=f=3000:t=q:w=1:g=1.5,loudnorm=I=-14:TP=-1.0:LRA=8','-ar','48000','-ac','2',str(audio)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);dur=duration(audio);ss=sentences(script);scene_count=max(7,min(18,math.ceil(dur/3.0)));seg=dur/scene_count;copy=[ss[min(len(ss)-1,math.floor(i*len(ss)/scene_count))] if ss else project.get('title','') for i in range(scene_count)];plans=shot_plan(project,copy,scene_count);clips=[];credits=[];used=set();fallbacks=0
  for i,p in enumerate(plans):
-  choices=[]
   try:choices=pexels_candidates(p['query'],'portrait') or pexels_candidates(p['query'],'landscape')
-  except Exception as e:print('Footage search:',e)
+  except Exception as e:
+   raise RuntimeError(f'Licensed footage search failed before scene {i+1}: {e}') from e
   hit=next((x for x in choices if x['url'] not in used),None);src=work/f'source-{i:02}.mp4'
   if hit:download(hit['url'],src);used.add(hit['url']);credits.append(hit)
   else:fallback_video(src,max(seg+1,4),i);fallbacks+=1
