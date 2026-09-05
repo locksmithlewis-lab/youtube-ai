@@ -1,10 +1,11 @@
 import json, math, os, re, subprocess, urllib.parse, urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 SUPABASE_URL=os.environ.get('SUPABASE_URL','').rstrip('/')
 SERVICE_KEY=os.environ.get('SUPABASE_SERVICE_ROLE_KEY','')
-ENGINE='rolixa-story-renderer-v2'
+ENGINE='rolixa-story-renderer-v3-fast'
 VOICE_MODEL=os.environ.get('PIPER_VOICE','en_US-lessac-medium')
 VOICE_DIR=Path(os.environ.get('PIPER_VOICE_DIR','.piper-voices'))
 if not SUPABASE_URL or not SERVICE_KEY: raise SystemExit('Supabase secrets required.')
@@ -26,8 +27,7 @@ def ts(sec):
 def sentences(script): return [re.sub(r'\s+',' ',x).strip() for x in re.split(r'(?<=[.!?])\s+',script) if x.strip()]
 def human_check(script):
     banned=['this short takes','this video will','start with the','the key is speed','this version is built','faceless angle']
-    low=script.lower()
-    hits=[x for x in banned if x in low]
+    low=script.lower(); hits=[x for x in banned if x in low]
     if hits: raise RuntimeError('Script failed human-language gate: '+', '.join(hits))
     if len(script.split())<55: raise RuntimeError('Script is too thin for an engaging Short.')
 
@@ -51,24 +51,25 @@ def draw_person(draw,cx,cy,scale,accent,pose=0):
     skin=(218,168,128); dark=(24,26,35); shirt=accent
     r=int(92*scale); draw.ellipse((cx-r,cy-r,cx+r,cy+r),fill=skin)
     draw.pieslice((cx-r-4,cy-r-12,cx+r+4,cy+r-20),180,355,fill=dark)
-    eye=int(8*scale); draw.ellipse((cx-int(34*scale)-eye,cy-int(8*scale)-eye,cx-int(34*scale)+eye,cy-int(8*scale)+eye),fill=dark); draw.ellipse((cx+int(34*scale)-eye,cy-int(8*scale)-eye,cx+int(34*scale)+eye,cy-int(8*scale)+eye),fill=dark)
+    eye=int(8*scale)
+    draw.ellipse((cx-int(34*scale)-eye,cy-int(8*scale)-eye,cx-int(34*scale)+eye,cy-int(8*scale)+eye),fill=dark)
+    draw.ellipse((cx+int(34*scale)-eye,cy-int(8*scale)-eye,cx+int(34*scale)+eye,cy-int(8*scale)+eye),fill=dark)
     draw.arc((cx-int(35*scale),cy+int(10*scale),cx+int(35*scale),cy+int(55*scale)),0,180,fill=dark,width=max(3,int(5*scale)))
     top=cy+r-5; bodyw=int(210*scale); draw.rounded_rectangle((cx-bodyw,top,cx+bodyw,top+int(430*scale)),radius=int(70*scale),fill=shirt)
     hand_y=top+int((170 if pose%2==0 else 100)*scale); arm=int(260*scale)
     draw.line((cx-bodyw+20,top+90,cx-arm,hand_y),fill=skin,width=int(45*scale)); draw.ellipse((cx-arm-28,hand_y-28,cx-arm+28,hand_y+28),fill=skin)
     draw.line((cx+bodyw-20,top+90,cx+arm,hand_y-int(80*scale)),fill=skin,width=int(45*scale)); draw.ellipse((cx+arm-28,hand_y-int(80*scale)-28,cx+arm+28,hand_y-int(80*scale)+28),fill=skin)
 
-def make_scene(path,text,index,total):
+def make_scene(args):
+    path,text,index,total=args
     W,H=1080,1920; palettes=[((18,20,38),(113,78,220)),((10,34,45),(24,166,180)),((38,18,35),(218,74,133)),((34,29,12),(224,155,45)),((15,36,25),(50,180,110))]
     bg,accent=palettes[index%len(palettes)]; im=Image.new('RGB',(W,H),bg); d=ImageDraw.Draw(im); big,mid,small=fonts()
     for y in range(H):
         t=y/H; d.line((0,y,W,y),fill=tuple(int(bg[i]*(1-t*.25)+accent[i]*t*.22) for i in range(3)))
     for k in range(7):
         x=(index*173+k*211)%1250-100; y=220+k*215; rr=45+(k%3)*24; d.ellipse((x-rr,y-rr,x+rr,y+rr),outline=tuple(min(255,c+45) for c in accent),width=8)
-    # Human-style illustrated presenter/character plus contextual data graphics.
     draw_person(d,540,720,1.05,accent,index)
     d.rounded_rectangle((70,80,290,145),28,fill=(7,8,15)); d.text((98,94),'ROLIXA',font=mid,fill='white')
-    # visual storytelling: rising graph / social burst
     pts=[]
     for x in range(110,970,110):
         yy=1510-int((x-110)*.38)-((x//110+index)%3)*45; pts.append((x,yy))
@@ -79,47 +80,67 @@ def make_scene(path,text,index,total):
         box=d.textbbox((0,0),line,font=big); tw=box[2]; x=(W-tw)//2
         d.rounded_rectangle((x-20,y-8,x+tw+20,y+82),18,fill=(5,6,12)); d.text((x,y),line,font=big,fill='white'); y+=92
     d.text((80,1760),f'{index+1:02} / {total:02}',font=small,fill=(225,225,235)); d.rounded_rectangle((190,1773,990,1785),6,fill=(65,68,80)); d.rounded_rectangle((190,1773,190+int(800*(index+1)/total),1785),6,fill=accent)
-    im.save(path,quality=95)
+    im.save(path,quality=92,optimize=False)
+    return path
 
-jobs=request('GET','/rest/v1/render_jobs?status=eq.queued&select=*&order=created_at.asc&limit=1') or []
-if not jobs: print('No queued render jobs.'); raise SystemExit(0)
-job=jobs[0]; patch('render_jobs',job['id'],{'status':'running','engine':ENGINE,'updated_at':'now()'})
+# Prefer Shorts so quick videos do not sit behind long-form renders.
+queued=request('GET','/rest/v1/render_jobs?status=eq.queued&select=*&order=created_at.asc&limit=12') or []
+if not queued: print('No queued render jobs.'); raise SystemExit(0)
+job=None
+for candidate in queued:
+    rows=request('GET',f"/rest/v1/video_projects?id=eq.{candidate['project_id']}&select=id,format,target_duration_seconds") or []
+    p=rows[0] if rows else {}
+    if str(p.get('format') or '').lower()=='short' or int(p.get('target_duration_seconds') or 99999)<=90:
+        job=candidate; break
+job=job or queued[0]
+patch('render_jobs',job['id'],{'status':'running','engine':ENGINE,'updated_at':'now()'})
 try:
     project=(request('GET',f"/rest/v1/video_projects?id=eq.{job['project_id']}&select=*") or [None])[0]
     if not project: raise RuntimeError('Project not found.')
     script=(project.get('script') or '').strip(); human_check(script)
-    pipe(project['id'],'voice','running','Generating and mastering neural narration.'); pipe(project['id'],'visuals','running','Building illustrated characters, data graphics, and animated story scenes.'); pipe(project['id'],'edit','running','Editing motion, captions, pacing, and mastered audio.')
+    pipe(project['id'],'voice','running','Generating and mastering neural narration.'); pipe(project['id'],'visuals','running','Building illustrated characters and story scenes in parallel.'); pipe(project['id'],'edit','running','Single-pass motion, captions, audio, and final encode.')
     work=Path('render-work'); work.mkdir(exist_ok=True); VOICE_DIR.mkdir(exist_ok=True)
     (work/'script.txt').write_text(script,encoding='utf-8'); model=VOICE_DIR/f'{VOICE_MODEL}.onnx'
     if not model.exists(): run(['python','-m','piper.download_voices','--download-dir',str(VOICE_DIR),VOICE_MODEL])
     raw=work/'raw.wav'
-    with (work/'script.txt').open() as src: run(['piper','--model',str(model),'--output_file',str(raw),'--length-scale','0.91','--sentence-silence','0.14'],stdin=src)
-    audio=work/'voice.wav'; run(['ffmpeg','-y','-i',str(raw),'-af','highpass=f=75,lowpass=f=12500,acompressor=threshold=-19dB:ratio=2.2:attack=12:release=180,equalizer=f=180:t=q:w=1:g=1.5,equalizer=f=3200:t=q:w=1:g=1.2,loudnorm=I=-15:TP=-1.2:LRA=9','-ar','48000','-ac','2',str(audio)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-    dur=duration(audio); ss=sentences(script); scene_count=max(8,min(14,math.ceil(dur/4.2))); scene_copy=[]
-    for i in range(scene_count): scene_copy.append(ss[min(len(ss)-1,math.floor(i*len(ss)/scene_count))] if ss else project.get('title',''))
-    sd=work/'scenes'; sd.mkdir(exist_ok=True); paths=[]
-    for i,text in enumerate(scene_copy): p=sd/f's{i:02}.jpg'; make_scene(p,text,i,scene_count); paths.append(p)
-    # Ken Burns motion on every scene; scene changes every ~4 sec.
-    seg=dur/scene_count; clips=[]
-    for i,p in enumerate(paths):
-        clip=work/f'clip{i:02}.mp4'; frames=max(1,int(seg*30)+2); zoom="min(zoom+0.0012,1.10)" if i%2==0 else "if(lte(zoom,1.0),1.10,max(1.0,zoom-0.0012))"
-        vf=f"scale=1200:2134,zoompan=z='{zoom}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s=1080x1920:fps=30"
-        run(['ffmpeg','-y','-loop','1','-i',str(p),'-vf',vf,'-t',f'{seg:.3f}','-c:v','libx264','-preset','veryfast','-crf','21','-pix_fmt','yuv420p',str(clip)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); clips.append(clip)
-    concat=work/'concat.txt'; concat.write_text('\n'.join(f"file '{p.resolve()}'" for p in clips),encoding='utf-8'); base=work/'base.mp4'
-    run(['ffmpeg','-y','-f','concat','-safe','0','-i',str(concat),'-c','copy',str(base)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    with (work/'script.txt').open() as src: run(['piper','--model',str(model),'--output_file',str(raw),'--length-scale','0.91'],stdin=src)
+    audio=work/'voice.wav'
+    run(['ffmpeg','-y','-i',str(raw),'-af','highpass=f=75,lowpass=f=12500,acompressor=threshold=-19dB:ratio=2.2:attack=12:release=180,equalizer=f=180:t=q:w=1:g=1.5,equalizer=f=3200:t=q:w=1:g=1.2,loudnorm=I=-15:TP=-1.2:LRA=9','-ar','48000','-ac','2',str(audio)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    dur=duration(audio); ss=sentences(script); scene_count=max(8,min(12,math.ceil(dur/4.5)))
+    scene_copy=[ss[min(len(ss)-1,math.floor(i*len(ss)/scene_count))] if ss else project.get('title','') for i in range(scene_count)]
+    sd=work/'scenes'; sd.mkdir(exist_ok=True); paths=[sd/f's{i:02}.jpg' for i in range(scene_count)]
+    workers=min(8,scene_count)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        list(pool.map(make_scene,[(paths[i],scene_copy[i],i,scene_count) for i in range(scene_count)]))
+
     words=script.split(); chunks=[' '.join(words[i:i+5]) for i in range(0,len(words),5)]; weights=[max(1,len(re.sub(r'\W','',c))) for c in chunks]; total=sum(weights); cur=0; lines=[]
-    for i,(c,w) in enumerate(zip(chunks,weights),1): start=cur; cur+=dur*w/total; lines += [str(i),f'{ts(start)} --> {ts(dur if i==len(chunks) else cur)}',c,'']
-    cap=work/'captions.srt'; cap.write_text('\n'.join(lines),encoding='utf-8'); out=work/'output.mp4'
-    sf=f"subtitles={cap}:force_style='FontName=DejaVu Sans,FontSize=30,Bold=1,PrimaryColour=&H00FFFFFF,BackColour=&HB0000000,BorderStyle=3,Outline=0,Alignment=2,MarginL=65,MarginR=65,MarginV=210'"
-    run(['ffmpeg','-y','-i',str(base),'-i',str(audio),'-vf',sf,'-c:v','libx264','-preset','veryfast','-crf','20','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart','-shortest',str(out)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    for i,(c,w) in enumerate(zip(chunks,weights),1):
+        start=cur; cur+=dur*w/total; lines += [str(i),f'{ts(start)} --> {ts(dur if i==len(chunks) else cur)}',c,'']
+    cap=work/'captions.srt'; cap.write_text('\n'.join(lines),encoding='utf-8')
+
+    # One FFmpeg process: animate all stills, concatenate, burn captions, add mastered audio, encode once.
+    seg=dur/scene_count; ff=['ffmpeg','-y']
+    for p in paths: ff += ['-loop','1','-t',f'{seg:.4f}','-i',str(p)]
+    audio_index=scene_count; ff += ['-i',str(audio)]
+    filters=[]; labels=[]
+    frames=max(1,int(seg*30)+2)
+    for i in range(scene_count):
+        zoom="min(zoom+0.0012,1.10)" if i%2==0 else "if(lte(zoom,1.0),1.10,max(1.0,zoom-0.0012))"
+        label=f'v{i}'; labels.append(f'[{label}]')
+        filters.append(f"[{i}:v]scale=1200:2134,zoompan=z='{zoom}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s=1080x1920:fps=30,setsar=1[{label}]")
+    filters.append(''.join(labels)+f'concat=n={scene_count}:v=1:a=0[story]')
+    filters.append(f"[story]subtitles={cap}:force_style='FontName=DejaVu Sans,FontSize=30,Bold=1,PrimaryColour=&H00FFFFFF,BackColour=&HB0000000,BorderStyle=3,Outline=0,Alignment=2,MarginL=65,MarginR=65,MarginV=210'[vout]")
+    out=work/'output.mp4'
+    ff += ['-filter_complex',';'.join(filters),'-map','[vout]','-map',f'{audio_index}:a','-c:v','libx264','-preset','superfast','-crf','20','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart','-threads','0','-shortest',str(out)]
+    run(ff,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     run(['ffmpeg','-v','error','-i',str(out),'-f','null','-'],stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
     if out.stat().st_size<300000: raise RuntimeError('Output failed size validation.')
     obj=f"{job['user_id']}/{job['project_id']}/{job['id']}.mp4"; url=SUPABASE_URL+'/storage/v1/object/video-outputs/'+urllib.parse.quote(obj,safe='/')
     with out.open('rb') as f:
         req=urllib.request.Request(url,data=f.read(),headers={'apikey':SERVICE_KEY,'Authorization':f'Bearer {SERVICE_KEY}','Content-Type':'video/mp4','x-upsert':'true'},method='POST'); urllib.request.urlopen(req,timeout=180).read()
     patch('render_jobs',job['id'],{'status':'completed','engine':ENGINE,'output_url':obj,'error':None,'updated_at':'now()'}); patch('video_projects',project['id'],{'output_url':obj,'status':'quality_check','failure_reason':None,'updated_at':'now()'})
-    pipe(project['id'],'voice','passed','Neural narration generated, EQ/compression mastered, and loudness normalized.'); pipe(project['id'],'visuals','passed',f'{scene_count} original illustrated character/data scenes with continuous camera motion rendered.'); pipe(project['id'],'edit','passed','1080x1920 H.264/AAC MP4 with rapid captions and motion edit decoded successfully.')
-    print(f'Rendered {obj} ({dur:.1f}s, {scene_count} animated scenes, {out.stat().st_size/1e6:.1f} MB)')
+    pipe(project['id'],'voice','passed','Neural narration generated and mastered.'); pipe(project['id'],'visuals','passed',f'{scene_count} illustrated story scenes generated in parallel with continuous camera motion.'); pipe(project['id'],'edit','passed','Single-pass 1080x1920 H.264/AAC encode with burned captions decoded successfully.')
+    print(f'Rendered {obj} ({dur:.1f}s, {scene_count} animated scenes, single-pass encode, {out.stat().st_size/1e6:.1f} MB)')
 except Exception as exc:
     msg=str(exc)[:1000]; patch('render_jobs',job['id'],{'status':'failed','engine':ENGINE,'error':msg,'updated_at':'now()'}); patch('video_projects',job['project_id'],{'status':'failed','failure_reason':msg,'updated_at':'now()'})
     for s in ('voice','visuals','edit'):
