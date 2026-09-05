@@ -23,6 +23,13 @@ function encrypt(value, secret) {
   return [iv.toString('base64url'), tag.toString('base64url'), ciphertext.toString('base64url')].join('.');
 }
 
+function requestOrigin(req) {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+  if (!host) return '';
+  const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+  return `${proto}://${host}`.replace(/\/$/, '');
+}
+
 async function supabaseRest(path, method, body, serviceKey, extraHeaders = {}) {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method,
@@ -41,7 +48,7 @@ async function supabaseRest(path, method, body, serviceKey, extraHeaders = {}) {
 }
 
 module.exports = async function handler(req, res) {
-  const appUrl = process.env.APP_URL;
+  const appUrl = requestOrigin(req) || String(process.env.APP_URL || '').replace(/\/$/, '');
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const stateSecret = process.env.YOUTUBE_OAUTH_STATE_SECRET;
@@ -68,7 +75,7 @@ module.exports = async function handler(req, res) {
   }
   if (!stateData.uid || !stateData.exp || Date.now() > stateData.exp) return res.status(400).send('OAuth state expired.');
 
-  const redirectUri = `${appUrl.replace(/\/$/, '')}/api/youtube-callback`;
+  const redirectUri = `${appUrl}/api/youtube-callback`;
   const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
