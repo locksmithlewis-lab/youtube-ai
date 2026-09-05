@@ -3,14 +3,15 @@ from pathlib import Path
 from visual_sources import plan_scene, choose, local_graphic_asset
 
 SUPABASE_URL=os.environ.get('SUPABASE_URL','').rstrip('/'); SERVICE_KEY=os.environ.get('SUPABASE_SERVICE_ROLE_KEY','')
-ENGINE='rolixa-multisource-renderer-v7.1'; VOICE_MODEL=os.environ.get('PIPER_VOICE','en_US-lessac-medium'); VOICE_DIR=Path(os.environ.get('PIPER_VOICE_DIR','.piper-voices'))
+ENGINE='rolixa-multisource-renderer-v7.2'; VOICE_MODEL=os.environ.get('PIPER_VOICE','en_US-lessac-medium'); VOICE_DIR=Path(os.environ.get('PIPER_VOICE_DIR','.piper-voices'))
 if not SUPABASE_URL or not SERVICE_KEY: raise SystemExit('Supabase secrets required.')
 HEADERS={'apikey':SERVICE_KEY,'Authorization':f'Bearer {SERVICE_KEY}','Content-Type':'application/json'}
 def request(method,path,data=None,extra=None):
  body=None if data is None else json.dumps(data).encode();h=dict(HEADERS);h.update(extra or {});r=urllib.request.Request(SUPABASE_URL+path,data=body,headers=h,method=method)
  with urllib.request.urlopen(r,timeout=90) as x:raw=x.read();return json.loads(raw.decode()) if raw else None
 def patch(t,i,p):return request('PATCH',f'/rest/v1/{t}?id=eq.{i}',p,{'Prefer':'return=minimal'})
-def set_step(p,step,status,detail):return request('POST','/rest/v1/project_pipeline_steps',{'user_id':p['user_id'],'project_id':p['id'],'step':step,'status':status,'detail':detail,'updated_at':'now()'},{'Prefer':'resolution=merge-duplicates,return=minimal'})
+def set_step(p,step,status,detail):
+ return request('POST','/rest/v1/rpc/upsert_project_pipeline_step',{'p_user_id':p['user_id'],'p_project_id':p['id'],'p_step':step,'p_status':status,'p_detail':detail})
 def run(cmd,**kw):return subprocess.run(cmd,check=True,**kw)
 def duration(p):return float(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','default=nw=1:nk=1',str(p)]).decode().strip())
 def ts(sec):ms=int(sec*1000);return f'{ms//3600000:02}:{(ms//60000)%60:02}:{(ms//1000)%60:02},{ms%1000:03}'
