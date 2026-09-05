@@ -27,8 +27,7 @@ def probe(url):
         if not live: continue
         vid=str(e.get('id') or '').strip()
         webpage=str(e.get('webpage_url') or e.get('url') or '').strip()
-        if webpage and not webpage.startswith('http') and vid:
-            webpage=f'https://www.youtube.com/watch?v={vid}'
+        if webpage and not webpage.startswith('http') and vid: webpage=f'https://www.youtube.com/watch?v={vid}'
         if not webpage: continue
         out.append({'id':vid or webpage,'url':webpage,'title':str(e.get('title') or 'Live stream').strip()})
     return out
@@ -43,33 +42,26 @@ for s in sources:
         if not live:
             print(f"No live stream: {s['label']}"); continue
         for item in live:
-            every=max(5,int(s.get('clip_every_minutes') or 15))
-            bucket=int(now.timestamp()//(every*60))
-            window_key=f'{bucket}'
+            every=max(5,int(s.get('clip_every_minutes') or 15)); bucket=int(now.timestamp()//(every*60)); window_key=str(bucket)
             qs=urllib.parse.urlencode({'watch_source_id':f"eq.{s['id']}",'stream_id':f"eq.{item['id']}",'window_key':f'eq.{window_key}','select':'id'})
-            existing=req('GET','/rest/v1/stream_watch_events?'+qs) or []
-            if existing: continue
-            event=(req('POST','/rest/v1/stream_watch_events',{
-                'user_id':s['user_id'],'watch_source_id':s['id'],'stream_id':item['id'],'stream_url':item['url'],'status':'live','window_key':window_key,'observed_at':now.isoformat(),'clip_queued':bool(s.get('auto_clip'))
-            },'return=representation') or [None])[0]
+            if req('GET','/rest/v1/stream_watch_events?'+qs) or []: continue
+            req('POST','/rest/v1/stream_watch_events',{'user_id':s['user_id'],'watch_source_id':s['id'],'stream_id':item['id'],'stream_url':item['url'],'status':'live','window_key':window_key,'observed_at':now.isoformat(),'clip_queued':bool(s.get('auto_clip'))},'return=minimal')
             req('PATCH',f"/rest/v1/stream_watch_sources?id=eq.{s['id']}",{'last_seen_live_at':now.isoformat(),'last_stream_id':item['id'],'last_stream_url':item['url'],'updated_at':now.isoformat()},'return=minimal')
             if not s.get('auto_clip'): continue
             length=max(15,min(180,int(s.get('clip_length_seconds') or 60)))
-            project=(req('POST','/rest/v1/video_projects',{
-                'user_id':s['user_id'],'title':f"{s['label']} — live clip candidate {now.strftime('%H:%M UTC')}",'topic':f"Live highlight candidate from authorized source {s['label']}",'format':'Clip','style':'Gaming','target_duration_seconds':length,'status':'generating','hook':'Live highlight candidate','script':'Authorized live-source highlight candidate captured automatically.'
-            },'return=representation') or [None])[0]
+            project=(req('POST','/rest/v1/video_projects',{'user_id':s['user_id'],'title':f"{s['label']} — live clip candidate {now.strftime('%H:%M UTC')}",'topic':f"Live highlight candidate from authorized source {s['label']}",'format':'Clip','style':'Gaming','target_duration_seconds':length,'status':'generating','hook':'Live highlight candidate','script':'Authorized live-source highlight candidate captured automatically.'},'return=representation') or [None])[0]
             if not project: continue
             steps=[
-                {'user_id':s['user_id'],'project_id':project['id'],'step':'research','status':'passed','detail':'No factual research required for entertainment clip; source reuse rights confirmed.'},
+                {'user_id':s['user_id'],'project_id':project['id'],'step':'research','status':'passed','detail':'Entertainment clip: factual research not required; source reuse rights confirmed.'},
                 {'user_id':s['user_id'],'project_id':project['id'],'step':'script','status':'passed','detail':'Entertainment clip uses authorized source audio/video.'},
                 {'user_id':s['user_id'],'project_id':project['id'],'step':'voice','status':'passed','detail':'Original live audio retained.'},
                 {'user_id':s['user_id'],'project_id':project['id'],'step':'visuals','status':'running','detail':'Capturing current authorized live segment.'},
-                {'user_id':s['user_id'],'project_id':project['id'],'step':'edit','status':'running','detail':'Formatting candidate highlight.'},
+                {'user_id':s['user_id'],'project_id':project['id'],'step':'edit','status':'running','detail':'Formatting and scoring candidate highlight.'},
                 {'user_id':s['user_id'],'project_id':project['id'],'step':'quality_check','status':'pending'},
                 {'user_id':s['user_id'],'project_id':project['id'],'step':'ready','status':'pending'}]
             req('POST','/rest/v1/project_pipeline_steps',steps,'return=minimal')
             req('POST','/rest/v1/hook_variants',{'user_id':s['user_id'],'project_id':project['id'],'hook':'Live highlight candidate','selected':True},'return=minimal')
-            req('POST','/rest/v1/clip_jobs',{'user_id':s['user_id'],'project_id':project['id'],'source_url':item['url'],'start_seconds':0,'end_seconds':length,'source_kind':'live-auto','rights_confirmed':True,'status':'queued'},'return=minimal')
+            req('POST','/rest/v1/clip_jobs',{'user_id':s['user_id'],'project_id':project['id'],'watch_source_id':s['id'],'stream_id':item['id'],'source_url':item['url'],'start_seconds':0,'end_seconds':length,'source_kind':'live-auto','rights_confirmed':True,'status':'queued'},'return=minimal')
             print(f"Queued live candidate from {s['label']}: {item['title']}")
     except Exception as exc:
         print(f"Watch source {s.get('id')} skipped: {exc}")
