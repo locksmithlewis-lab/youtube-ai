@@ -23,16 +23,29 @@ def choose_job():
         if str(p.get('format') or '').lower()=='short' or int(p.get('target_duration_seconds') or 99999)<=90:return j,p
     j=queued[0];rows=req('GET',f"/rest/v1/video_projects?id=eq.{j['project_id']}&select=id,format,target_duration_seconds") or [];return j,(rows[0] if rows else {})
 
+def status(job_id):
+    rows=req('GET',f'/rest/v1/render_jobs?id=eq.{job_id}&select=status') or []
+    return (rows[0] if rows else {}).get('status')
+
 job,project=choose_job()
 if not job:
     subprocess.run(['python','scripts/render_video.py'],check=True)
     raise SystemExit(0)
 started=datetime.now(timezone.utc);tick=time.monotonic();patch(job['id'],{'started_at':started.isoformat()})
+proc=subprocess.Popen(['python','scripts/render_video.py'])
 try:
-    subprocess.run(['python','scripts/render_video.py'],check=True)
+    while proc.poll() is None:
+        time.sleep(1)
+        if status(job['id'])=='canceled':
+            print(f"Cancel requested for render {job['id']}; stopping renderer.")
+            proc.terminate()
+            try: proc.wait(timeout=8)
+            except subprocess.TimeoutExpired:
+                proc.kill();proc.wait()
+            break
+    if proc.returncode not in (0,None,-15) and status(job['id'])!='canceled':
+        raise subprocess.CalledProcessError(proc.returncode,['python','scripts/render_video.py'])
 finally:
-    done=datetime.now(timezone.utc);actual=max(.1,time.monotonic()-tick)
-    rows=req('GET',f"/rest/v1/render_jobs?id=eq.{job['id']}&select=status") or []
-    status=(rows[0] if rows else {}).get('status')
-    if status in ('completed','failed'):
+    done=datetime.now(timezone.utc);actual=max(.1,time.monotonic()-tick);state=status(job['id'])
+    if state in ('completed','failed','canceled'):
         patch(job['id'],{'completed_at':done.isoformat(),'actual_render_seconds':actual,'media_duration_seconds':project.get('target_duration_seconds'),'updated_at':done.isoformat()})
