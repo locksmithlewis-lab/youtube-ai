@@ -23,14 +23,20 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
+      - name: Cache highlight speech model
+        uses: actions/cache@v4
+        with:
+          path: .whisper-cache
+          key: faster-whisper-tiny-en-v1
       - name: Install clip tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg
-          python -m pip install --upgrade yt-dlp
+          python -m pip install --quiet --upgrade yt-dlp faster-whisper
       - name: Process score prune and auto-post best authorized clip
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ROLIXA_BASE_URL: https://rolixa-bey56lewis-4041.vercel.app
+          HF_HOME: .whisper-cache
         run: python scripts/clip_stream.py
