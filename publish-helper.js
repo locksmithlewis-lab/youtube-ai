@@ -1,3 +1,4 @@
+// Rolixa private-publish bridge. Uses the signed-in browser session; no secrets are exposed client-side.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 const supabaseUrl = 'https://uqmnpeovwfzizajheuig.supabase.co';
