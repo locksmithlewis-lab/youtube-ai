@@ -28,8 +28,9 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg
           python -m pip install --upgrade yt-dlp
-      - name: Process oldest authorized clip
+      - name: Process score prune and auto-post best authorized clip
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ROLIXA_BASE_URL: https://rolixa-bey56lewis-4041.vercel.app
         run: python scripts/clip_stream.py
