@@ -21,12 +21,19 @@ def request(method,path,data=None,extra_headers=None):
 def patch(table,row_id,payload):
     return request('PATCH',f'/rest/v1/{table}?id=eq.{row_id}',payload,{'Prefer':'return=minimal'})
 
+def patch_pipeline(project_id, step, status, detail=None):
+    payload={'status':status,'updated_at':'now()'}
+    if detail is not None:
+        payload['detail']=detail
+    path=f'/rest/v1/project_pipeline_steps?project_id=eq.{project_id}&step=eq.{urllib.parse.quote(step)}'
+    return request('PATCH',path,payload,{'Prefer':'return=minimal'})
+
 jobs=request('GET','/rest/v1/render_jobs?status=eq.queued&select=*&order=created_at.asc&limit=1') or []
 if not jobs:
     print('No queued render jobs.')
     raise SystemExit(0)
 job=jobs[0]
-patch('render_jobs',job['id'],{'status':'running','updated_at':'now()'})
+patch('render_jobs',job['id'],{'status':'running','engine':'github-actions-ffmpeg-espeak','updated_at':'now()'})
 
 try:
     projects=request('GET',f"/rest/v1/video_projects?id=eq.{job['project_id']}&select=*") or []
@@ -35,6 +42,10 @@ try:
     script=(project.get('script') or '').strip()
     title=(project.get('title') or 'Untitled video').strip()
     if not script: raise RuntimeError('Add a script before requesting a render.')
+
+    patch_pipeline(project['id'],'voice','running','Generating narration with eSpeak NG.')
+    patch_pipeline(project['id'],'visuals','running','Building the vertical background frame.')
+    patch_pipeline(project['id'],'edit','running','Rendering captions, audio, and final MP4.')
 
     work=Path('render-work'); work.mkdir(exist_ok=True)
     script_file=work/'script.txt'; script_file.write_text(script,encoding='utf-8')
@@ -55,7 +66,7 @@ try:
     for line in wrapped:
         box=d.textbbox((0,0),line,font=title_font); x=(W-(box[2]-box[0]))/2
         d.text((x,y),line,font=title_font,fill='white'); y+=82
-    footer='YouTube AI · original render'
+    footer='Rolixa · original render'
     box=d.textbbox((0,0),footer,font=small_font); d.text(((W-(box[2]-box[0]))/2,1660),footer,font=small_font,fill=(175,182,198))
     bg=work/'background.png'; img.save(bg)
 
@@ -80,10 +91,19 @@ try:
         req=urllib.request.Request(upload_url,data=f.read(),headers={'apikey':SERVICE_KEY,'Authorization':f'Bearer {SERVICE_KEY}','Content-Type':'video/mp4','x-upsert':'true'},method='POST')
         with urllib.request.urlopen(req,timeout=120) as r: r.read()
 
-    patch('render_jobs',job['id'],{'status':'completed','output_url':object_path,'updated_at':'now()'})
-    patch('video_projects',project['id'],{'output_url':object_path,'status':'quality_check','updated_at':'now()'})
+    patch('render_jobs',job['id'],{'status':'completed','engine':'github-actions-ffmpeg-espeak','output_url':object_path,'updated_at':'now()'})
+    patch('video_projects',project['id'],{'output_url':object_path,'status':'quality_check','failure_reason':None,'updated_at':'now()'})
+    patch_pipeline(project['id'],'voice','passed','Narration generated successfully with eSpeak NG.')
+    patch_pipeline(project['id'],'visuals','passed','Vertical visual frame generated successfully.')
+    patch_pipeline(project['id'],'edit','passed','MP4 render and burned captions completed successfully.')
     print('Rendered',object_path)
 except Exception as exc:
-    patch('render_jobs',job['id'],{'status':'failed','error':str(exc)[:1000],'updated_at':'now()'})
-    patch('video_projects',job['project_id'],{'status':'failed','failure_reason':str(exc)[:1000],'updated_at':'now()'})
+    message=str(exc)[:1000]
+    patch('render_jobs',job['id'],{'status':'failed','engine':'github-actions-ffmpeg-espeak','error':message,'updated_at':'now()'})
+    patch('video_projects',job['project_id'],{'status':'failed','failure_reason':message,'updated_at':'now()'})
+    for step in ('voice','visuals','edit'):
+        try:
+            patch_pipeline(job['project_id'],step,'failed',message)
+        except Exception:
+            pass
     raise
