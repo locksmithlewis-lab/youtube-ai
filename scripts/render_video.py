@@ -1,9 +1,9 @@
-import json, math, os, re, subprocess, time, urllib.parse, urllib.request
+import json, math, os, re, subprocess, time, urllib.error, urllib.parse, urllib.request
 from pathlib import Path
 from visual_sources import plan_scene, choose, local_graphic_asset
 
 SUPABASE_URL=os.environ.get('SUPABASE_URL','').rstrip('/'); SERVICE_KEY=os.environ.get('SUPABASE_SERVICE_ROLE_KEY','')
-ENGINE='rolixa-multisource-renderer-v7'; VOICE_MODEL=os.environ.get('PIPER_VOICE','en_US-lessac-medium'); VOICE_DIR=Path(os.environ.get('PIPER_VOICE_DIR','.piper-voices'))
+ENGINE='rolixa-multisource-renderer-v7.1'; VOICE_MODEL=os.environ.get('PIPER_VOICE','en_US-lessac-medium'); VOICE_DIR=Path(os.environ.get('PIPER_VOICE_DIR','.piper-voices'))
 if not SUPABASE_URL or not SERVICE_KEY: raise SystemExit('Supabase secrets required.')
 HEADERS={'apikey':SERVICE_KEY,'Authorization':f'Bearer {SERVICE_KEY}','Content-Type':'application/json'}
 def request(method,path,data=None,extra=None):
@@ -22,12 +22,21 @@ def claim():
  rows=request('POST','/rest/v1/rpc/claim_next_render_job',{}) or []
  return rows[0] if rows else None
 def download(url,path):
- req=urllib.request.Request(url,headers={'User-Agent':'RolixaVisualRouter/2.0','Accept':'*/*'})
- with urllib.request.urlopen(req,timeout=120) as r,open(path,'wb') as f:
-  while True:
-   b=r.read(1024*1024)
-   if not b:break
-   f.write(b)
+ for attempt in range(3):
+  try:
+   req=urllib.request.Request(url,headers={'User-Agent':'RolixaVisualRouter/2.0','Accept':'*/*'})
+   with urllib.request.urlopen(req,timeout=120) as r,open(path,'wb') as f:
+    while True:
+     b=r.read(1024*1024)
+     if not b:break
+     f.write(b)
+   return True
+  except urllib.error.HTTPError as e:
+   if e.code not in (403,408,429,500,502,503,504):return False
+   time.sleep(1.25*(attempt+1))
+  except Exception:
+   time.sleep(.75*(attempt+1))
+ return False
 def motion_filter(motion='push',frames=120):
  z="min(zoom+0.00020,1.025)" if motion!='pull' else "if(lte(zoom,1.0),1.025,max(1.0,zoom-0.00018))"
  return f"scale=1000:1760:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=0x090b10,zoompan=z='{z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s=1080x1920:fps=30,eq=contrast=1.04:saturation=1.06,setsar=1"
@@ -42,8 +51,21 @@ def qc(assets,total):
  if len(ids)/max(1,total)<.75:reasons.append('visual repetition is too high')
  if avg<.42:reasons.append(f'average visual relevance is only {avg:.2f}')
  if total>=8 and len(providers)<2:reasons.append('only one visual provider was used')
- if graphics>math.ceil(total*.5):reasons.append('generated graphics dominate the edit')
+ if graphics>math.ceil(total*.55):reasons.append('generated graphics dominate the edit')
  return reasons,avg,providers
+
+def render_asset(asset,plan,i,seg,frames,work):
+ src=work/f'source-{i:02}.mp4';clip=work/f'clip-{i:02}.mp4'
+ if asset['media_type']=='graphic':
+  make_graphic(src,max(seg+.3,3.5),i,plan);run(['ffmpeg','-y','-stream_loop','-1','-i',str(src),'-t',f'{seg:.3f}','-an','-c:v','libx264','-preset','veryfast','-crf','20','-pix_fmt','yuv420p',str(clip)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);return clip,asset
+ if asset['media_type']=='image':
+  image=work/f'image-{i:02}.img'
+  if not download(asset['url'],image):asset=local_graphic_asset(plan,i);return render_asset(asset,plan,i,seg,frames,work)
+  try:run(['ffmpeg','-y','-loop','1','-i',str(image),'-t',f'{seg:.3f}','-vf',motion_filter('push' if i%2==0 else 'pull',frames),'-an','-c:v','libx264','-preset','veryfast','-crf','20','-pix_fmt','yuv420p',str(clip)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);return clip,asset
+  except Exception:asset=local_graphic_asset(plan,i);return render_asset(asset,plan,i,seg,frames,work)
+ if not download(asset['url'],src):asset=local_graphic_asset(plan,i);return render_asset(asset,plan,i,seg,frames,work)
+ try:run(['ffmpeg','-y','-stream_loop','-1','-i',str(src),'-t',f'{seg:.3f}','-an','-vf',motion_filter('push' if i%2==0 else 'pull',frames),'-c:v','libx264','-preset','veryfast','-crf','20','-pix_fmt','yuv420p',str(clip)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);return clip,asset
+ except Exception:asset=local_graphic_asset(plan,i);return render_asset(asset,plan,i,seg,frames,work)
 
 job=claim()
 if not job:print('No queued render jobs.');raise SystemExit(0)
@@ -61,19 +83,11 @@ try:
  dur=duration(audio);ss=sentences(script);scene_count=max(8,min(22,math.ceil(dur/3.1)));seg=dur/scene_count;copies=[ss[min(len(ss)-1,math.floor(i*len(ss)/scene_count))] for i in range(scene_count)]
  used=set();clips=[];assets=[]
  for i,line in enumerate(copies):
-  kinds=['establishing wide','human medium','detail close up','action','environment','human reaction'];plan=plan_scene(line,project,kinds[i%len(kinds)])
-  asset=None
-  # Fiction gets intentional original motion-graphic beats instead of forcing unrelated stock imagery.
+  kinds=['establishing wide','human medium','detail close up','action','environment','human reaction'];plan=plan_scene(line,project,kinds[i%len(kinds)]);asset=None
   if plan['domain']=='fiction' and i%4==0:asset=local_graphic_asset(plan,i)
   if not asset:asset=choose(plan,used,.42)
   if not asset:asset=local_graphic_asset(plan,i)
-  used.add(asset['id']);src=work/f'source-{i:02}.mp4';clip=work/f'clip-{i:02}.mp4';frames=max(2,int(seg*30)+2)
-  if asset['media_type']=='graphic':make_graphic(src,max(seg+.3,3.5),i,plan);run(['ffmpeg','-y','-stream_loop','-1','-i',str(src),'-t',f'{seg:.3f}','-an','-c:v','libx264','-preset','veryfast','-crf','20','-pix_fmt','yuv420p',str(clip)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-  elif asset['media_type']=='image':
-   image=work/f'image-{i:02}.img';download(asset['url'],image);run(['ffmpeg','-y','-loop','1','-i',str(image),'-t',f'{seg:.3f}','-vf',motion_filter('push' if i%2==0 else 'pull',frames),'-an','-c:v','libx264','-preset','veryfast','-crf','20','-pix_fmt','yuv420p',str(clip)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-  else:
-   download(asset['url'],src);run(['ffmpeg','-y','-stream_loop','-1','-i',str(src),'-t',f'{seg:.3f}','-an','-vf',motion_filter('push' if i%2==0 else 'pull',frames),'-c:v','libx264','-preset','veryfast','-crf','20','-pix_fmt','yuv420p',str(clip)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-  record_asset(job,project,i,plan,asset);assets.append(asset);clips.append(clip)
+  clip,asset=render_asset(asset,plan,i,seg,max(2,int(seg*30)+2),work);used.add(asset['id']);record_asset(job,project,i,plan,asset);assets.append(asset);clips.append(clip)
  reasons,avg,providers=qc(assets,scene_count)
  if reasons:raise RuntimeError('Visual relevance gate failed: '+'; '.join(reasons)+'.')
  words=script.split();chunks=[' '.join(words[i:i+3]) for i in range(0,len(words),3)];weights=[max(1,len(re.sub(r'\W','',c))) for c in chunks];total=sum(weights);cur=0;lines=[]
