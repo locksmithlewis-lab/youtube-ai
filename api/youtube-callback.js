@@ -87,7 +87,22 @@ module.exports = async function handler(req, res) {
       grant_type: 'authorization_code',
     }),
   });
-  if (!tokenResp.ok) return res.status(502).send('Google token exchange failed.');
+  if (!tokenResp.ok) {
+    let googleError = {};
+    try {
+      googleError = await tokenResp.json();
+    } catch {
+      googleError = { error: 'unparseable_google_error' };
+    }
+    console.error('Google OAuth token exchange rejected', {
+      status: tokenResp.status,
+      error: googleError.error || 'unknown_error',
+      error_description: googleError.error_description || null,
+      redirect_uri: redirectUri,
+      client_id_suffix: clientId ? String(clientId).slice(-32) : null,
+    });
+    return res.status(502).send('Google token exchange failed.');
+  }
   const tokens = await tokenResp.json();
   if (!tokens.access_token) return res.status(502).send('Google did not return an access token.');
 
