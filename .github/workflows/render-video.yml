@@ -17,7 +17,7 @@ permissions:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     concurrency:
       group: rolixa-render-queue
       cancel-in-progress: false
@@ -30,16 +30,17 @@ jobs:
           path: .piper-voices
           key: piper-en-US-lessac-medium-v1
 
-      - name: Install renderer
+      - name: Install cinematic renderer
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
-          python -m pip install --quiet pillow piper-tts==1.6.0
+          python -m pip install --quiet piper-tts==1.6.0
 
       - name: Render next queued project and record real timing
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PIPER_VOICE: en_US-lessac-medium
           PIPER_VOICE_DIR: .piper-voices
         run: python scripts/render_with_metrics.py
