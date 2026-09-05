@@ -15,12 +15,19 @@ function looksLikeGoogleWebClientId(value) {
   return /^\d+-[a-z0-9_-]+\.apps\.googleusercontent\.com$/i.test(String(value || '').trim());
 }
 
+function requestOrigin(req) {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+  if (!host) return '';
+  const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
+  return `${proto}://${host}`.replace(/\/$/, '');
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const clientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
   const stateSecret = process.env.YOUTUBE_OAUTH_STATE_SECRET;
-  const appUrl = process.env.APP_URL;
+  const appUrl = requestOrigin(req) || String(process.env.APP_URL || '').replace(/\/$/, '');
   if (!clientId || !stateSecret || !appUrl) {
     return res.status(503).json({ error: 'YouTube OAuth is not configured yet.' });
   }
@@ -49,7 +56,7 @@ module.exports = async function handler(req, res) {
   const encoded = base64url(JSON.stringify(stateData));
   const state = `${encoded}.${sign(encoded, stateSecret)}`;
 
-  const redirectUri = `${appUrl.replace(/\/$/, '')}/api/youtube-callback`;
+  const redirectUri = `${appUrl}/api/youtube-callback`;
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
