@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/render_video.py'
+      - 'scripts/render_with_metrics.py'
       - '.github/workflows/render-video.yml'
   schedule:
     - cron: '*/5 * * * *'
@@ -35,10 +36,10 @@ jobs:
           sudo apt-get install -y -qq ffmpeg
           python -m pip install --quiet pillow piper-tts==1.6.0
 
-      - name: Render oldest queued project
+      - name: Render next queued project and record real timing
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PIPER_VOICE: en_US-lessac-medium
           PIPER_VOICE_DIR: .piper-voices
-        run: python scripts/render_video.py
+        run: python scripts/render_with_metrics.py
