@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+supa-key.txt
+render-work/
+__pycache__/
+*.pyc
+.DS_Store
