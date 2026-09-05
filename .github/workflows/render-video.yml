@@ -2,6 +2,11 @@ name: Render queued video
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/render_video.py'
+      - '.github/workflows/render-video.yml'
   schedule:
     - cron: '*/5 * * * *'
 
@@ -11,19 +16,29 @@ permissions:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     concurrency:
       group: rolixa-render-queue
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v5
+
+      - name: Cache Piper voice
+        uses: actions/cache@v4
+        with:
+          path: .piper-voices
+          key: piper-en-US-lessac-medium-v1
+
       - name: Install renderer
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg espeak-ng fonts-dejavu-core
-          python -m pip install --quiet pillow
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          python -m pip install --quiet pillow piper-tts==1.6.0
+
       - name: Render oldest queued project
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PIPER_VOICE: en_US-lessac-medium
+          PIPER_VOICE_DIR: .piper-voices
         run: python scripts/render_video.py
