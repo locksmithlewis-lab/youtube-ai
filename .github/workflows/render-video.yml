@@ -12,8 +12,11 @@ jobs:
   render:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      group: rolixa-render-queue
+      cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install renderer
         run: |
           sudo apt-get update
