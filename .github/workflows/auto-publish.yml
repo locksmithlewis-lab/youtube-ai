@@ -1,0 +1,29 @@
+name: Auto publish ready videos
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/10 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rolixa-auto-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Publish next QC-cleared videos as Public
+        env:
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          test -n "$SERVICE_KEY"
+          curl --fail-with-body --retry 2 --max-time 840 \
+            -X POST 'https://rolixa-bey56lewis-4041.vercel.app/api/auto-publish-ready' \
+            -H "Authorization: Bearer $SERVICE_KEY" \
+            -H 'Content-Type: application/json' \
+            --data '{}'
