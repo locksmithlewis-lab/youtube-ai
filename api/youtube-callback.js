@@ -35,7 +35,7 @@ async function supabaseRest(path, method, body, serviceKey, extraHeaders = {}) {
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!response.ok) throw new Error(`Supabase write failed (${response.status})`);
+  if (!response.ok) throw new Error(`Supabase request failed (${response.status})`);
   const text = await response.text();
   return text ? JSON.parse(text) : null;
 }
@@ -94,10 +94,17 @@ module.exports = async function handler(req, res) {
 
   const scopeList = String(tokens.scope || '').split(' ').filter(Boolean);
   const expiresAt = new Date(Date.now() + Number(tokens.expires_in || 3600) * 1000).toISOString();
+  const existingRows = await supabaseRest(`youtube_oauth_tokens?user_id=eq.${stateData.uid}&select=refresh_token_ciphertext`, 'GET', null, serviceKey) || [];
+  const refreshTokenCiphertext = tokens.refresh_token
+    ? encrypt(tokens.refresh_token, tokenSecret)
+    : existingRows[0]?.refresh_token_ciphertext;
+  if (!refreshTokenCiphertext) {
+    return res.status(502).send('Google did not return a refresh token. Reconnect YouTube and approve access again.');
+  }
 
   const tokenRecord = {
     user_id: stateData.uid,
-    refresh_token_ciphertext: tokens.refresh_token ? encrypt(tokens.refresh_token, tokenSecret) : encrypt('', tokenSecret),
+    refresh_token_ciphertext: refreshTokenCiphertext,
     access_token_ciphertext: encrypt(tokens.access_token, tokenSecret),
     expires_at: expiresAt,
     scopes: scopeList,
