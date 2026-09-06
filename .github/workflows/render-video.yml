@@ -32,7 +32,7 @@ jobs:
           - worker: 4
             voice: en_GB-alba-medium
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5
 
@@ -46,17 +46,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .rolixa-cache
-          key: ${{ runner.os }}-rolixa-visual-v3-${{ github.run_id }}-${{ matrix.worker }}
+          key: ${{ runner.os }}-motion-visual-v4-${{ github.run_id }}-${{ matrix.worker }}
           restore-keys: |
-            ${{ runner.os }}-rolixa-visual-v3-
+            ${{ runner.os }}-motion-visual-v4-
 
-      - name: Install cinematic renderer
+      - name: Install motion-first renderer
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
           python -m pip install --quiet piper-tts==1.6.0
 
-      - name: Render and immediately publish the completed video
+      - name: Render and immediately publish only if publish-grade QC passes
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -77,10 +77,10 @@ jobs:
           PY
           )
           if [ -z "$PROJECT_ID" ]; then
-            echo "No rendered project id found; nothing to auto publish."
+            echo "No publish-grade rendered project found."
             exit 0
           fi
-          echo "Publishing rendered project $PROJECT_ID as Public"
+          echo "Publishing QC-approved project $PROJECT_ID as Public"
           curl --fail-with-body --retry 2 --max-time 840 \
             -X POST "$PUBLISH_URL" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
