@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'api/auto-publish-ready.js'
+      - 'api/cleanup-duplicates.js'
       - '.github/workflows/auto-publish.yml'
   schedule:
     - cron: '*/10 * * * *'
@@ -22,6 +23,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - name: Remove duplicate public uploads
+        env:
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          test -n "$SERVICE_KEY"
+          curl --fail-with-body --retry 2 --max-time 840 \
+            -X POST 'https://riloxa-bey56lewis-4041.vercel.app/api/cleanup-duplicates' \
+            -H "Authorization: Bearer $SERVICE_KEY" \
+            -H 'Content-Type: application/json' \
+            --data '{}'
+
       - name: Publish every rendered QC-cleared video as Public
         env:
           SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
