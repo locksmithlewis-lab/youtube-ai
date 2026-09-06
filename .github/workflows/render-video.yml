@@ -8,6 +8,7 @@ on:
       - 'scripts/render_video.py'
       - 'scripts/render_with_metrics.py'
       - 'scripts/visual_sources.py'
+      - 'api/auto-publish-ready.js'
       - '.github/workflows/render-video.yml'
   schedule:
     - cron: '*/5 * * * *'
@@ -55,7 +56,7 @@ jobs:
           sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
           python -m pip install --quiet piper-tts==1.6.0
 
-      - name: Atomically claim and render one queued project
+      - name: Render and immediately publish the completed video
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -64,4 +65,24 @@ jobs:
           PIPER_VOICE_DIR: .piper-voices
           ROLIXA_VISUAL_CACHE: .rolixa-cache
           ROLIXA_WORKER: ${{ matrix.worker }}
-        run: python scripts/render_with_metrics.py
+          PUBLISH_URL: https://riloxa-bey56lewis-4041.vercel.app/api/auto-publish-ready
+        run: |
+          set -euo pipefail
+          python scripts/render_with_metrics.py | tee render.log
+          PROJECT_ID=$(python - <<'PY'
+          import re
+          text=open('render.log',encoding='utf-8',errors='ignore').read()
+          matches=re.findall(r'Rendered\s+[^/\s]+/([^/\s]+)/[^:\s]+\.mp4:',text)
+          print(matches[-1] if matches else '')
+          PY
+          )
+          if [ -z "$PROJECT_ID" ]; then
+            echo "No rendered project id found; nothing to auto publish."
+            exit 0
+          fi
+          echo "Publishing rendered project $PROJECT_ID as Public"
+          curl --fail-with-body --retry 2 --max-time 840 \
+            -X POST "$PUBLISH_URL" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H 'Content-Type: application/json' \
+            --data "{\"project_id\":\"$PROJECT_ID\"}"
