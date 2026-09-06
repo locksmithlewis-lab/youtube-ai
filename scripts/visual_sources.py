@@ -6,8 +6,13 @@ CACHE=Path(os.environ.get('ROLIXA_VISUAL_CACHE','.rolixa-cache')); CACHE.mkdir(e
 SEARCH_CACHE=CACHE/'search.json'
 try: _cache=json.loads(SEARCH_CACHE.read_text()) if SEARCH_CACHE.exists() else {}
 except Exception: _cache={}
-UA='RolixaVisualRouter/2.0 (free licensed media matching)'
-STOP={'this','that','with','from','have','will','your','they','them','then','into','about','while','where','when','what','people','video','right','really','just','every','inside','thing','things','there','their','would','could','should','scene','chapter'}
+UA='RolixaVisualRouter/2.1 (free licensed media matching + recurring characters)'
+STOP={'this','that','with','from','have','will','your','they','them','then','into','about','while','where','when','what','people','video','right','really','just','every','inside','thing','things','there','their','would','could','should','scene','chapter','opening','ending','continue','nothing','same','central','question'}
+COMMON_CAPS={'The','This','That','Then','When','Where','What','Nothing','Continue','Scene','Chapter','Opening','Ending','Act','At','By','A','An','And','But','For','From','Into','With','Without','After','Before','They','Their','It','Its','One','Every','Now','Once','Finally'}
+HAIR=['long waves','short textured hair','braided hair','shoulder-length hair','undercut']
+OUTFITS=['teal expedition jacket','silver utility suit','deep blue harbor coat','coral-red field vest','black-and-gold dive gear']
+SILHOUETTES=['slim angular silhouette','athletic broad-shouldered silhouette','compact energetic silhouette','tall graceful silhouette','sturdy practical silhouette']
+ACCESSORIES=['silver wrist beacon','triangular pendant','round dive goggles','utility shoulder strap','glowing compass clip']
 
 def words(s): return [x.lower() for x in re.findall(r"[A-Za-z0-9']+",s or '') if len(x)>2 and x.lower() not in STOP]
 def uniq(xs):
@@ -28,6 +33,18 @@ def cache_put(k,v):
  try:SEARCH_CACHE.write_text(json.dumps(_cache)[-1500000:],encoding='utf-8')
  except Exception:pass
 
+def character_name(text):
+ names=[]
+ for name in re.findall(r"\b[A-Z][a-z]{2,}\b",text or ''):
+  if name not in COMMON_CAPS and name.lower() not in STOP and name not in names:names.append(name)
+ return names[0] if names else None
+
+def recurring_character(name,project=None):
+ if not name:return None
+ series_hint=re.sub(r'\s+[—-]\s+Chapter.*$','',str((project or {}).get('title') or ''),flags=re.I).strip()
+ seed=int(hashlib.sha256(f'{series_hint}:{name}'.encode()).hexdigest()[:12],16)
+ return {'name':name,'identity_key':re.sub(r'[^a-z0-9]','',name.lower()),'hair_style':HAIR[seed%len(HAIR)],'signature_outfit':OUTFITS[(seed//7)%len(OUTFITS)],'silhouette':SILHOUETTES[(seed//13)%len(SILHOUETTES)],'accessory':ACCESSORIES[(seed//19)%len(ACCESSORIES)],'visual_rule':'Keep this identity, hair, outfit family, silhouette and accessory consistent in every chapter.'}
+
 def classify(text,project=None):
  low=(' '.join([text or '',(project or {}).get('topic') or '',(project or {}).get('title') or '',(project or {}).get('style') or ''])).lower()
  if any(x in low for x in ['chapter','mermaid','neon harbor','fiction','animated','animation','cyberpunk','fantasy','mystery story']):return 'fiction'
@@ -37,18 +54,22 @@ def classify(text,project=None):
  return 'general'
 
 def plan_scene(text,project=None,shot_type='environment'):
- keys=uniq(words(text)[:7]+words((project or {}).get('topic') or (project or {}).get('title') or '')[:4])
- domain=classify(text,project); query=' '.join(keys[:8]) or 'cinematic environment'
- # Search terms stay literal; provider ranking handles style rather than contaminating queries with vague stock-photo words.
- return {'text':text,'domain':domain,'query':query,'keywords':keys[:8],'shot_type':shot_type}
+ domain=classify(text,project); character=recurring_character(character_name(text),project) if domain=='fiction' else None
+ base=uniq(words(text)[:7]+words((project or {}).get('topic') or (project or {}).get('title') or '')[:4])
+ if character:
+  identity=[character['name'],character['hair_style'],character['signature_outfit'],character['silhouette'],character['accessory']]
+  keys=uniq(identity+base)[:12]
+ else:keys=base
+ query=' '.join(base[:8]) or 'cinematic environment'
+ return {'text':text,'domain':domain,'query':query,'keywords':keys,'shot_type':shot_type,'character':character}
 
 def relevance(plan,item):
- q=set(plan.get('keywords') or []); hay=set(words(' '.join([str(item.get('title') or ''),str(item.get('tags') or ''),str(item.get('description') or ''),str(item.get('credit') or '')])))
+ q=set(words(' '.join(plan.get('keywords') or []))); hay=set(words(' '.join([str(item.get('title') or ''),str(item.get('tags') or ''),str(item.get('description') or ''),str(item.get('credit') or '')])))
  overlap=len(q & hay)/max(1,len(q)); provider=item.get('provider')
  bonus={'wikimedia':.10,'openverse':.08,'pexels':.06,'local-graphic':.03}.get(provider,0)
  if plan.get('domain')=='history' and provider=='wikimedia':bonus+=.16
  if plan.get('domain')=='nature' and provider in ('pexels','openverse','wikimedia'):bonus+=.10
- if plan.get('domain')=='fiction' and provider=='local-graphic':bonus+=.18
+ if plan.get('domain')=='fiction' and provider=='local-graphic':bonus+=.24
  if plan.get('domain')=='science' and provider in ('wikimedia','openverse','local-graphic'):bonus+=.11
  return min(1.0,.25+overlap*.65+bonus)
 
@@ -111,5 +132,6 @@ def choose(plan,used=None,min_score=.42):
  return None
 
 def local_graphic_asset(plan,index):
- title=' '.join((plan.get('keywords') or [])[:5]) or 'Story beat'
- return {'provider':'local-graphic','media_type':'graphic','id':f"graphic:{index}:{hashlib.sha1(title.encode()).hexdigest()[:10]}",'url':None,'page':None,'credit':'Generated locally by Rolixa','license':'Original Rolixa graphic','title':title,'tags':' '.join(plan.get('keywords') or []),'relevance_score':round(relevance(plan,{'provider':'local-graphic','title':title,'tags':title}),3)}
+ c=plan.get('character'); title=(f"{c['name']} • {c['hair_style']} • {c['signature_outfit']} • {c['accessory']}" if c else ' '.join((plan.get('keywords') or [])[:5])) or 'Story beat'
+ ident=(c or {}).get('identity_key') or hashlib.sha1(title.encode()).hexdigest()[:10]
+ return {'provider':'local-graphic','media_type':'graphic','id':f"graphic:{ident}:{index%4}",'url':None,'page':None,'credit':'Generated locally by Rolixa','license':'Original Rolixa graphic','title':title,'tags':' '.join(plan.get('keywords') or []),'character_profile':c,'relevance_score':round(relevance(plan,{'provider':'local-graphic','title':title,'tags':title}),3)}
