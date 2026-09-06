@@ -1,20 +1,17 @@
-import hashlib, html, json, os, re, urllib.error, urllib.parse, urllib.request
+import hashlib, html, json, os, re, urllib.parse, urllib.request
 from pathlib import Path
 
 PEXELS_API_KEY=os.environ.get('PEXELS_API_KEY','').strip()
 CACHE=Path(os.environ.get('ROLIXA_VISUAL_CACHE','.rolixa-cache')); CACHE.mkdir(exist_ok=True)
 SEARCH_CACHE=CACHE/'search.json'
-try: _cache=json.loads(SEARCH_CACHE.read_text()) if SEARCH_CACHE.exists() else {}
-except Exception: _cache={}
-UA='RolixaVisualRouter/2.2 (free licensed media matching + recurring characters + diversity preference)'
+try:_cache=json.loads(SEARCH_CACHE.read_text()) if SEARCH_CACHE.exists() else {}
+except Exception:_cache={}
+UA='MotionVisualRouter/3.0 (licensed moving footage + motion graphics)'
 STOP={'this','that','with','from','have','will','your','they','them','then','into','about','while','where','when','what','people','video','right','really','just','every','inside','thing','things','there','their','would','could','should','scene','chapter','opening','ending','continue','nothing','same','central','question'}
 COMMON_CAPS={'The','This','That','Then','When','Where','What','Nothing','Continue','Scene','Chapter','Opening','Ending','Act','At','By','A','An','And','But','For','From','Into','With','Without','After','Before','They','Their','It','Its','One','Every','Now','Once','Finally'}
-HAIR=['long waves','short textured hair','braided hair','shoulder-length hair','undercut']
-OUTFITS=['teal expedition jacket','silver utility suit','deep blue harbor coat','coral-red field vest','black-and-gold dive gear']
-SILHOUETTES=['slim angular silhouette','athletic broad-shouldered silhouette','compact energetic silhouette','tall graceful silhouette','sturdy practical silhouette']
-ACCESSORIES=['silver wrist beacon','triangular pendant','round dive goggles','utility shoulder strap','glowing compass clip']
+HAIR=['long waves','short textured hair','braided hair','shoulder-length hair','undercut'];OUTFITS=['teal expedition jacket','silver utility suit','deep blue harbor coat','coral-red field vest','black-and-gold dive gear'];SILHOUETTES=['slim angular silhouette','athletic broad-shouldered silhouette','compact energetic silhouette','tall graceful silhouette','sturdy practical silhouette'];ACCESSORIES=['silver wrist beacon','triangular pendant','round dive goggles','utility shoulder strap','glowing compass clip']
 
-def words(s): return [x.lower() for x in re.findall(r"[A-Za-z0-9']+",s or '') if len(x)>2 and x.lower() not in STOP]
+def words(s):return [x.lower() for x in re.findall(r"[A-Za-z0-9']+",s or '') if len(x)>2 and x.lower() not in STOP]
 def uniq(xs):
  out=[];seen=set()
  for x in xs:
@@ -25,9 +22,8 @@ def uniq(xs):
 def fetch_json(url,headers=None,timeout=25):
  req=urllib.request.Request(url,headers={'User-Agent':UA,'Accept':'application/json',**(headers or {})})
  with urllib.request.urlopen(req,timeout=timeout) as r:return json.loads(r.read().decode())
-
-def strip_html(v): return re.sub(r'<[^>]+>','',html.unescape(str(v or ''))).strip()
-def cache_get(k): return _cache.get(k)
+def strip_html(v):return re.sub(r'<[^>]+>','',html.unescape(str(v or ''))).strip()
+def cache_get(k):return _cache.get(k)
 def cache_put(k,v):
  _cache[k]=v
  try:SEARCH_CACHE.write_text(json.dumps(_cache)[-1500000:],encoding='utf-8')
@@ -41,9 +37,8 @@ def character_name(text):
 
 def recurring_character(name,project=None):
  if not name:return None
- series_hint=re.sub(r'\s+[—-]\s+Chapter.*$','',str((project or {}).get('title') or ''),flags=re.I).strip()
- seed=int(hashlib.sha256(f'{series_hint}:{name}'.encode()).hexdigest()[:12],16)
- return {'name':name,'identity_key':re.sub(r'[^a-z0-9]','',name.lower()),'hair_style':HAIR[seed%len(HAIR)],'signature_outfit':OUTFITS[(seed//7)%len(OUTFITS)],'silhouette':SILHOUETTES[(seed//13)%len(SILHOUETTES)],'accessory':ACCESSORIES[(seed//19)%len(ACCESSORIES)],'visual_rule':'Keep this identity, hair, outfit family, silhouette and accessory consistent in every chapter.'}
+ series_hint=re.sub(r'\s+[—-]\s+Chapter.*$','',str((project or {}).get('title') or ''),flags=re.I).strip();seed=int(hashlib.sha256(f'{series_hint}:{name}'.encode()).hexdigest()[:12],16)
+ return {'name':name,'identity_key':re.sub(r'[^a-z0-9]','',name.lower()),'hair_style':HAIR[seed%len(HAIR)],'signature_outfit':OUTFITS[(seed//7)%len(OUTFITS)],'silhouette':SILHOUETTES[(seed//13)%len(SILHOUETTES)],'accessory':ACCESSORIES[(seed//19)%len(ACCESSORIES)]}
 
 def classify(text,project=None):
  low=(' '.join([text or '',(project or {}).get('topic') or '',(project or {}).get('title') or '',(project or {}).get('style') or ''])).lower()
@@ -54,26 +49,22 @@ def classify(text,project=None):
  return 'general'
 
 def plan_scene(text,project=None,shot_type='environment'):
- domain=classify(text,project); character=recurring_character(character_name(text),project) if domain=='fiction' else None
- base=uniq(words(text)[:7]+words((project or {}).get('topic') or (project or {}).get('title') or '')[:4])
- keys=uniq(([character['name'],character['hair_style'],character['signature_outfit'],character['silhouette'],character['accessory']] if character else [])+base)[:12]
- query=' '.join(base[:8]) or 'cinematic environment'
- return {'text':text,'domain':domain,'query':query,'keywords':keys,'shot_type':shot_type,'character':character}
+ domain=classify(text,project);character=recurring_character(character_name(text),project) if domain=='fiction' else None;base=uniq(words(text)[:7]+words((project or {}).get('topic') or (project or {}).get('title') or '')[:4]);keys=uniq(([character['name'],character['hair_style'],character['signature_outfit'],character['silhouette'],character['accessory']] if character else [])+base)[:12];query=' '.join(base[:8]) or 'cinematic environment';return {'text':text,'domain':domain,'query':query,'keywords':keys,'shot_type':shot_type,'character':character}
 
 def relevance(plan,item):
- q=set(words(' '.join(plan.get('keywords') or []))); hay=set(words(' '.join([str(item.get('title') or ''),str(item.get('tags') or ''),str(item.get('description') or ''),str(item.get('credit') or '')])))
- overlap=len(q & hay)/max(1,len(q)); provider=item.get('provider'); bonus={'wikimedia':.10,'openverse':.08,'pexels':.06,'local-graphic':.03}.get(provider,0)
- if plan.get('domain')=='history' and provider=='wikimedia':bonus+=.16
- if plan.get('domain')=='nature' and provider in ('pexels','openverse','wikimedia'):bonus+=.10
- if plan.get('domain')=='fiction' and provider=='local-graphic':bonus+=.24
- if plan.get('domain')=='science' and provider in ('wikimedia','openverse','local-graphic'):bonus+=.11
- return min(1.0,.25+overlap*.65+bonus)
+ q=set(words(' '.join(plan.get('keywords') or [])));hay=set(words(' '.join([str(item.get('title') or ''),str(item.get('tags') or ''),str(item.get('description') or ''),str(item.get('credit') or '')])));overlap=len(q&hay)/max(1,len(q));provider=item.get('provider');bonus={'wikimedia-video':.12,'wikimedia':.08,'openverse':.06,'pexels':.08,'local-motion':.05}.get(provider,0)
+ if item.get('media_type')=='video':bonus+=.10
+ if plan.get('domain')=='history' and provider.startswith('wikimedia'):bonus+=.14
+ if plan.get('domain')=='nature' and provider in ('pexels','wikimedia-video'):bonus+=.10
+ if plan.get('domain')=='fiction' and provider=='local-motion':bonus+=.22
+ if plan.get('domain')=='science' and provider in ('wikimedia-video','wikimedia','local-motion'):bonus+=.10
+ return min(1.0,.24+overlap*.62+bonus)
 
 def pexels(q):
  if not PEXELS_API_KEY:return []
- k='pexels:'+q
+ k='pexels-video:'+q
  if cache_get(k) is not None:return cache_get(k)
- try:data=fetch_json('https://api.pexels.com/v1/videos/search?'+urllib.parse.urlencode({'query':q,'per_page':12,'size':'medium'}),{'Authorization':PEXELS_API_KEY})
+ try:data=fetch_json('https://api.pexels.com/v1/videos/search?'+urllib.parse.urlencode({'query':q,'per_page':15,'size':'medium'}),{'Authorization':PEXELS_API_KEY})
  except Exception:return []
  out=[]
  for v in data.get('videos') or []:
@@ -81,44 +72,58 @@ def pexels(q):
   if f:out.append({'provider':'pexels','media_type':'video','id':f"pexels:{v.get('id')}",'url':f['link'],'page':v.get('url'),'credit':(v.get('user') or {}).get('name'),'license':'Pexels License','title':q,'tags':q})
  cache_put(k,out);return out
 
-def openverse(q):
- k='openverse:'+q
+def wikimedia_video(q):
+ k='commons-video:'+q
  if cache_get(k) is not None:return cache_get(k)
- try:data=fetch_json('https://api.openverse.org/v1/images/?'+urllib.parse.urlencode({'q':q,'page_size':15,'mature':'false'}))
- except Exception:return []
- out=[]
- for x in data.get('results') or []:
-  url=x.get('url') or x.get('thumbnail')
-  if url:out.append({'provider':'openverse','media_type':'image','id':'openverse:'+str(x.get('id')),'url':url,'page':x.get('foreign_landing_url') or x.get('detail_url'),'credit':x.get('creator'),'license':' '.join(filter(None,[x.get('license'),x.get('license_version')])).strip() or 'Open license','title':x.get('title'),'tags':' '.join(t.get('name','') if isinstance(t,dict) else str(t) for t in (x.get('tags') or [])[:12]),'description':x.get('title')})
- cache_put(k,out);return out
-
-def wikimedia(q):
- k='wikimedia:'+q
- if cache_get(k) is not None:return cache_get(k)
- params={'action':'query','format':'json','generator':'search','gsrsearch':q+' filetype:bitmap','gsrnamespace':6,'gsrlimit':12,'prop':'imageinfo','iiprop':'url|extmetadata','iiurlwidth':1400,'origin':'*'}
+ params={'action':'query','format':'json','generator':'search','gsrsearch':q+' filetype:video','gsrnamespace':6,'gsrlimit':12,'prop':'imageinfo','iiprop':'url|mime|extmetadata','origin':'*'}
  try:data=fetch_json('https://commons.wikimedia.org/w/api.php?'+urllib.parse.urlencode(params))
  except Exception:return []
  out=[]
  for p in (data.get('query') or {}).get('pages',{}).values():
-  ii=((p.get('imageinfo') or [{}])[0]); meta=ii.get('extmetadata') or {}; url=ii.get('thumburl') or ii.get('url')
-  if url:out.append({'provider':'wikimedia','media_type':'image','id':'wikimedia:'+str(p.get('pageid')),'url':url,'page':'https://commons.wikimedia.org/wiki/'+urllib.parse.quote(str(p.get('title') or '').replace(' ','_')),'credit':strip_html((meta.get('Artist') or {}).get('value')) or strip_html((meta.get('Credit') or {}).get('value')),'license':strip_html((meta.get('LicenseShortName') or {}).get('value')) or 'Wikimedia Commons license','title':p.get('title'),'description':strip_html((meta.get('ImageDescription') or {}).get('value')),'tags':q})
+  ii=(p.get('imageinfo') or [{}])[0];mime=str(ii.get('mime') or '');url=ii.get('url');meta=ii.get('extmetadata') or {}
+  if url and mime.startswith('video/'):
+   out.append({'provider':'wikimedia-video','media_type':'video','id':'commons-video:'+str(p.get('pageid')),'url':url,'page':'https://commons.wikimedia.org/wiki/'+urllib.parse.quote(str(p.get('title') or '').replace(' ','_')),'credit':strip_html((meta.get('Artist') or {}).get('value')),'license':strip_html((meta.get('LicenseShortName') or {}).get('value')) or 'Wikimedia Commons license','title':p.get('title'),'description':strip_html((meta.get('ImageDescription') or {}).get('value')),'tags':q})
+ cache_put(k,out);return out
+
+def openverse(q):
+ k='openverse:'+q
+ if cache_get(k) is not None:return cache_get(k)
+ try:data=fetch_json('https://api.openverse.org/v1/images/?'+urllib.parse.urlencode({'q':q,'page_size':12,'mature':'false'}))
+ except Exception:return []
+ out=[]
+ for x in data.get('results') or []:
+  url=x.get('url') or x.get('thumbnail')
+  if url:out.append({'provider':'openverse','media_type':'image','id':'openverse:'+str(x.get('id')),'url':url,'page':x.get('foreign_landing_url') or x.get('detail_url'),'credit':x.get('creator'),'license':' '.join(filter(None,[x.get('license'),x.get('license_version')])).strip() or 'Open license','title':x.get('title'),'tags':' '.join(t.get('name','') if isinstance(t,dict) else str(t) for t in (x.get('tags') or [])[:10]),'description':x.get('title')})
+ cache_put(k,out);return out
+
+def wikimedia(q):
+ k='wikimedia-image:'+q
+ if cache_get(k) is not None:return cache_get(k)
+ params={'action':'query','format':'json','generator':'search','gsrsearch':q+' filetype:bitmap','gsrnamespace':6,'gsrlimit':10,'prop':'imageinfo','iiprop':'url|extmetadata','iiurlwidth':1400,'origin':'*'}
+ try:data=fetch_json('https://commons.wikimedia.org/w/api.php?'+urllib.parse.urlencode(params))
+ except Exception:return []
+ out=[]
+ for p in (data.get('query') or {}).get('pages',{}).values():
+  ii=(p.get('imageinfo') or [{}])[0];meta=ii.get('extmetadata') or {};url=ii.get('thumburl') or ii.get('url')
+  if url:out.append({'provider':'wikimedia','media_type':'image','id':'wikimedia:'+str(p.get('pageid')),'url':url,'page':'https://commons.wikimedia.org/wiki/'+urllib.parse.quote(str(p.get('title') or '').replace(' ','_')),'credit':strip_html((meta.get('Artist') or {}).get('value')),'license':strip_html((meta.get('LicenseShortName') or {}).get('value')) or 'Wikimedia Commons license','title':p.get('title'),'description':strip_html((meta.get('ImageDescription') or {}).get('value')),'tags':q})
  cache_put(k,out);return out
 
 def candidates(plan):
- q=plan['query'];domain=plan['domain'];providers={'pexels':lambda:pexels(q),'wikimedia':lambda:wikimedia(q),'openverse':lambda:openverse(q)};order={'history':['wikimedia','openverse','pexels'],'nature':['pexels','openverse','wikimedia'],'science':['wikimedia','openverse','pexels'],'fiction':['openverse','wikimedia','pexels'],'general':['pexels','openverse','wikimedia']}[domain];out=[]
+ q=plan['query'];domain=plan['domain'];providers={'pexels':lambda:pexels(q),'commons-video':lambda:wikimedia_video(q),'wikimedia':lambda:wikimedia(q),'openverse':lambda:openverse(q)};order={'history':['commons-video','pexels','wikimedia','openverse'],'nature':['pexels','commons-video','wikimedia','openverse'],'science':['commons-video','pexels','wikimedia','openverse'],'fiction':['pexels','commons-video','openverse','wikimedia'],'general':['pexels','commons-video','wikimedia','openverse']}[domain];out=[]
  for name in order:
   for x in providers[name]():x=dict(x);x['relevance_score']=round(relevance(plan,x),3);out.append(x)
- return sorted(out,key=lambda x:x['relevance_score'],reverse=True)
+ return sorted(out,key=lambda x:(x.get('media_type')=='video',x['relevance_score']),reverse=True)
 
 def choose(plan,used=None,min_score=.42,used_providers=None):
- used=used or set(); used_providers=used_providers or set(); pool=[x for x in candidates(plan) if x.get('id') not in used and x.get('relevance_score',0)>=min_score]
+ used=used or set();used_providers=used_providers or set();pool=[x for x in candidates(plan) if x.get('id') not in used and x.get('relevance_score',0)>=min_score]
  if not pool:return None
- best=pool[0]
+ videos=[x for x in pool if x.get('media_type')=='video'];best=max(pool,key=lambda x:x.get('relevance_score',0));vbest=max(videos,key=lambda x:x.get('relevance_score',0)) if videos else None
+ chosen=vbest if vbest and vbest.get('relevance_score',0)>=best.get('relevance_score',0)-.18 else best
  if used_providers:
-  alternate=next((x for x in pool if x.get('provider') not in used_providers and x.get('relevance_score',0)>=best.get('relevance_score',0)-.14),None)
-  if alternate:return alternate
- return best
+  alt=next((x for x in pool if x.get('media_type')=='video' and x.get('provider') not in used_providers and x.get('relevance_score',0)>=chosen.get('relevance_score',0)-.12),None)
+  if alt:return alt
+ return chosen
 
 def local_graphic_asset(plan,index):
- c=plan.get('character'); title=(f"{c['name']} • {c['hair_style']} • {c['signature_outfit']} • {c['accessory']}" if c else ' '.join((plan.get('keywords') or [])[:5])) or 'Story beat';ident=(c or {}).get('identity_key') or hashlib.sha1(title.encode()).hexdigest()[:10]
- return {'provider':'local-graphic','media_type':'graphic','id':f"graphic:{ident}:{index%4}",'url':None,'page':None,'credit':'Generated locally by Rolixa','license':'Original Rolixa graphic','title':title,'tags':' '.join(plan.get('keywords') or []),'character_profile':c,'relevance_score':round(relevance(plan,{'provider':'local-graphic','title':title,'tags':title}),3)}
+ c=plan.get('character');title=(f"{c['name']} {c['hair_style']} {c['signature_outfit']} {c['accessory']}" if c else ' '.join((plan.get('keywords') or [])[:5])) or 'Story beat';ident=(c or {}).get('identity_key') or hashlib.sha1(title.encode()).hexdigest()[:10]
+ return {'provider':'local-motion','media_type':'graphic','id':f"motion:{ident}:{index%8}",'url':None,'page':None,'credit':'Generated locally','license':'Original motion graphic','title':title,'tags':' '.join(plan.get('keywords') or []),'character_profile':c,'relevance_score':round(relevance(plan,{'provider':'local-motion','title':title,'tags':title}),3)}
