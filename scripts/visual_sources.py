@@ -6,7 +6,7 @@ CACHE=Path(os.environ.get('ROLIXA_VISUAL_CACHE','.rolixa-cache')); CACHE.mkdir(e
 SEARCH_CACHE=CACHE/'search.json'
 try: _cache=json.loads(SEARCH_CACHE.read_text()) if SEARCH_CACHE.exists() else {}
 except Exception: _cache={}
-UA='RolixaVisualRouter/2.1 (free licensed media matching + recurring characters)'
+UA='RolixaVisualRouter/2.2 (free licensed media matching + recurring characters + diversity preference)'
 STOP={'this','that','with','from','have','will','your','they','them','then','into','about','while','where','when','what','people','video','right','really','just','every','inside','thing','things','there','their','would','could','should','scene','chapter','opening','ending','continue','nothing','same','central','question'}
 COMMON_CAPS={'The','This','That','Then','When','Where','What','Nothing','Continue','Scene','Chapter','Opening','Ending','Act','At','By','A','An','And','But','For','From','Into','With','Without','After','Before','They','Their','It','Its','One','Every','Now','Once','Finally'}
 HAIR=['long waves','short textured hair','braided hair','shoulder-length hair','undercut']
@@ -56,17 +56,13 @@ def classify(text,project=None):
 def plan_scene(text,project=None,shot_type='environment'):
  domain=classify(text,project); character=recurring_character(character_name(text),project) if domain=='fiction' else None
  base=uniq(words(text)[:7]+words((project or {}).get('topic') or (project or {}).get('title') or '')[:4])
- if character:
-  identity=[character['name'],character['hair_style'],character['signature_outfit'],character['silhouette'],character['accessory']]
-  keys=uniq(identity+base)[:12]
- else:keys=base
+ keys=uniq(([character['name'],character['hair_style'],character['signature_outfit'],character['silhouette'],character['accessory']] if character else [])+base)[:12]
  query=' '.join(base[:8]) or 'cinematic environment'
  return {'text':text,'domain':domain,'query':query,'keywords':keys,'shot_type':shot_type,'character':character}
 
 def relevance(plan,item):
  q=set(words(' '.join(plan.get('keywords') or []))); hay=set(words(' '.join([str(item.get('title') or ''),str(item.get('tags') or ''),str(item.get('description') or ''),str(item.get('credit') or '')])))
- overlap=len(q & hay)/max(1,len(q)); provider=item.get('provider')
- bonus={'wikimedia':.10,'openverse':.08,'pexels':.06,'local-graphic':.03}.get(provider,0)
+ overlap=len(q & hay)/max(1,len(q)); provider=item.get('provider'); bonus={'wikimedia':.10,'openverse':.08,'pexels':.06,'local-graphic':.03}.get(provider,0)
  if plan.get('domain')=='history' and provider=='wikimedia':bonus+=.16
  if plan.get('domain')=='nature' and provider in ('pexels','openverse','wikimedia'):bonus+=.10
  if plan.get('domain')=='fiction' and provider=='local-graphic':bonus+=.24
@@ -81,8 +77,7 @@ def pexels(q):
  except Exception:return []
  out=[]
  for v in data.get('videos') or []:
-  fs=sorted(v.get('video_files') or [],key=lambda x:(x.get('width') or 0)*(x.get('height') or 0),reverse=True)
-  f=next((x for x in fs if x.get('link') and (x.get('height') or 0)>=720),None)
+  fs=sorted(v.get('video_files') or [],key=lambda x:(x.get('width') or 0)*(x.get('height') or 0),reverse=True);f=next((x for x in fs if x.get('link') and (x.get('height') or 0)>=720),None)
   if f:out.append({'provider':'pexels','media_type':'video','id':f"pexels:{v.get('id')}",'url':f['link'],'page':v.get('url'),'credit':(v.get('user') or {}).get('name'),'license':'Pexels License','title':q,'tags':q})
  cache_put(k,out);return out
 
@@ -94,9 +89,7 @@ def openverse(q):
  out=[]
  for x in data.get('results') or []:
   url=x.get('url') or x.get('thumbnail')
-  if not url:continue
-  lic=' '.join(filter(None,[x.get('license'),x.get('license_version')])).strip() or 'Open license'
-  out.append({'provider':'openverse','media_type':'image','id':'openverse:'+str(x.get('id')),'url':url,'page':x.get('foreign_landing_url') or x.get('detail_url'),'credit':x.get('creator'),'license':lic,'title':x.get('title'),'tags':' '.join(t.get('name','') if isinstance(t,dict) else str(t) for t in (x.get('tags') or [])[:12]),'description':x.get('title')})
+  if url:out.append({'provider':'openverse','media_type':'image','id':'openverse:'+str(x.get('id')),'url':url,'page':x.get('foreign_landing_url') or x.get('detail_url'),'credit':x.get('creator'),'license':' '.join(filter(None,[x.get('license'),x.get('license_version')])).strip() or 'Open license','title':x.get('title'),'tags':' '.join(t.get('name','') if isinstance(t,dict) else str(t) for t in (x.get('tags') or [])[:12]),'description':x.get('title')})
  cache_put(k,out);return out
 
 def wikimedia(q):
@@ -108,30 +101,24 @@ def wikimedia(q):
  out=[]
  for p in (data.get('query') or {}).get('pages',{}).values():
   ii=((p.get('imageinfo') or [{}])[0]); meta=ii.get('extmetadata') or {}; url=ii.get('thumburl') or ii.get('url')
-  if not url:continue
-  license_name=strip_html((meta.get('LicenseShortName') or {}).get('value')) or 'Wikimedia Commons license'
-  credit=strip_html((meta.get('Artist') or {}).get('value')) or strip_html((meta.get('Credit') or {}).get('value'))
-  desc=strip_html((meta.get('ImageDescription') or {}).get('value'))
-  out.append({'provider':'wikimedia','media_type':'image','id':'wikimedia:'+str(p.get('pageid')),'url':url,'page':'https://commons.wikimedia.org/wiki/'+urllib.parse.quote(str(p.get('title') or '').replace(' ','_')),'credit':credit,'license':license_name,'title':p.get('title'),'description':desc,'tags':q})
+  if url:out.append({'provider':'wikimedia','media_type':'image','id':'wikimedia:'+str(p.get('pageid')),'url':url,'page':'https://commons.wikimedia.org/wiki/'+urllib.parse.quote(str(p.get('title') or '').replace(' ','_')),'credit':strip_html((meta.get('Artist') or {}).get('value')) or strip_html((meta.get('Credit') or {}).get('value')),'license':strip_html((meta.get('LicenseShortName') or {}).get('value')) or 'Wikimedia Commons license','title':p.get('title'),'description':strip_html((meta.get('ImageDescription') or {}).get('value')),'tags':q})
  cache_put(k,out);return out
 
 def candidates(plan):
- q=plan['query'];domain=plan['domain']
- providers={'pexels':lambda:pexels(q),'wikimedia':lambda:wikimedia(q),'openverse':lambda:openverse(q)}
- order={'history':['wikimedia','openverse','pexels'],'nature':['pexels','openverse','wikimedia'],'science':['wikimedia','openverse','pexels'],'fiction':['openverse','wikimedia','pexels'],'general':['pexels','openverse','wikimedia']}[domain]
- out=[]
+ q=plan['query'];domain=plan['domain'];providers={'pexels':lambda:pexels(q),'wikimedia':lambda:wikimedia(q),'openverse':lambda:openverse(q)};order={'history':['wikimedia','openverse','pexels'],'nature':['pexels','openverse','wikimedia'],'science':['wikimedia','openverse','pexels'],'fiction':['openverse','wikimedia','pexels'],'general':['pexels','openverse','wikimedia']}[domain];out=[]
  for name in order:
-  for x in providers[name]():
-   x=dict(x);x['relevance_score']=round(relevance(plan,x),3);out.append(x)
+  for x in providers[name]():x=dict(x);x['relevance_score']=round(relevance(plan,x),3);out.append(x)
  return sorted(out,key=lambda x:x['relevance_score'],reverse=True)
 
-def choose(plan,used=None,min_score=.42):
- used=used or set()
- for x in candidates(plan):
-  if x.get('id') not in used and x.get('relevance_score',0)>=min_score:return x
- return None
+def choose(plan,used=None,min_score=.42,used_providers=None):
+ used=used or set(); used_providers=used_providers or set(); pool=[x for x in candidates(plan) if x.get('id') not in used and x.get('relevance_score',0)>=min_score]
+ if not pool:return None
+ best=pool[0]
+ if used_providers:
+  alternate=next((x for x in pool if x.get('provider') not in used_providers and x.get('relevance_score',0)>=best.get('relevance_score',0)-.14),None)
+  if alternate:return alternate
+ return best
 
 def local_graphic_asset(plan,index):
- c=plan.get('character'); title=(f"{c['name']} • {c['hair_style']} • {c['signature_outfit']} • {c['accessory']}" if c else ' '.join((plan.get('keywords') or [])[:5])) or 'Story beat'
- ident=(c or {}).get('identity_key') or hashlib.sha1(title.encode()).hexdigest()[:10]
+ c=plan.get('character'); title=(f"{c['name']} • {c['hair_style']} • {c['signature_outfit']} • {c['accessory']}" if c else ' '.join((plan.get('keywords') or [])[:5])) or 'Story beat';ident=(c or {}).get('identity_key') or hashlib.sha1(title.encode()).hexdigest()[:10]
  return {'provider':'local-graphic','media_type':'graphic','id':f"graphic:{ident}:{index%4}",'url':None,'page':None,'credit':'Generated locally by Rolixa','license':'Original Rolixa graphic','title':title,'tags':' '.join(plan.get('keywords') or []),'character_profile':c,'relevance_score':round(relevance(plan,{'provider':'local-graphic','title':title,'tags':title}),3)}
