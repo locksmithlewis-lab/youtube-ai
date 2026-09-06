@@ -21,25 +21,33 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        worker: [1, 2, 3, 4]
+        include:
+          - worker: 1
+            voice: en_US-lessac-medium
+          - worker: 2
+            voice: en_US-ryan-medium
+          - worker: 3
+            voice: en_US-amy-medium
+          - worker: 4
+            voice: en_GB-alba-medium
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
-      - name: Cache Piper voice
+      - name: Cache Piper voices
         uses: actions/cache@v4
         with:
           path: .piper-voices
-          key: piper-en-US-lessac-medium-v1
+          key: piper-voice-pool-v2
 
       - name: Restore visual search cache
         uses: actions/cache@v4
         with:
           path: .rolixa-cache
-          key: ${{ runner.os }}-rolixa-visual-v2-${{ github.run_id }}-${{ matrix.worker }}
+          key: ${{ runner.os }}-rolixa-visual-v3-${{ github.run_id }}-${{ matrix.worker }}
           restore-keys: |
-            ${{ runner.os }}-rolixa-visual-v2-
+            ${{ runner.os }}-rolixa-visual-v3-
 
       - name: Install cinematic renderer
         run: |
@@ -52,7 +60,7 @@ jobs:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          PIPER_VOICE: en_US-lessac-medium
+          PIPER_VOICE: ${{ matrix.voice }}
           PIPER_VOICE_DIR: .piper-voices
           ROLIXA_VISUAL_CACHE: .rolixa-cache
           ROLIXA_WORKER: ${{ matrix.worker }}
