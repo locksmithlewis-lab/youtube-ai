@@ -1,6 +1,7 @@
 import json, os, re, subprocess, tempfile, urllib.parse, urllib.request
 from pathlib import Path
 from production_guard import creative_preflight, final_video_qc, publication_priority
+from longform_writer import needs_script, write as write_longform
 URL=os.environ.get('SUPABASE_URL','').rstrip('/');KEY=os.environ.get('SUPABASE_SERVICE_ROLE_KEY','')
 H={'apikey':KEY,'Authorization':f'Bearer {KEY}','Content-Type':'application/json'}
 def req(method,path,data=None,prefer=None):
@@ -11,12 +12,24 @@ def req(method,path,data=None,prefer=None):
 def patch(table,id,data):return req('PATCH',f'/rest/v1/{table}?id=eq.{id}',data,'return=minimal')
 def step(p,name,status,detail):return req('POST','/rest/v1/rpc/upsert_project_pipeline_step',{'p_user_id':p['user_id'],'p_project_id':p['id'],'p_step':name,'p_status':status,'p_detail':detail})
 def report(p,job,stage,result):return req('POST','/rest/v1/video_quality_reports',{'user_id':p['user_id'],'project_id':p['id'],'render_job_id':job.get('id') if job else None,'stage':stage,'passed':result['passed'],'score':result['score'],'reasons':result.get('reasons') or [],'metrics':result.get('metrics') or {}},'return=minimal')
+def prepare_longform(p):
+ if not needs_script(p):return p
+ sources=req('GET',f"/rest/v1/research_sources?project_id=eq.{p['id']}&select=title,url,claim,verified") or []
+ step(p,'script_writer','running','Writing final long-form spoken narration with a dedicated language model.')
+ try:
+  made=write_longform(p,sources);patch('video_projects',p['id'],{'script':made['script'],'hook':made['hook'],'updated_at':'now()'});p=dict(p,script=made['script'],hook=made['hook']);step(p,'script_writer','passed',f"Generated {made['word_count']} words of final narration with {made['model']}.");return p
+ except Exception as e:
+  step(p,'script_writer','failed',str(e));raise
 def preflight_queue():
  jobs=req('GET','/rest/v1/render_jobs?status=eq.queued&select=id,project_id,user_id&order=created_at.asc&limit=12') or []
  for j in jobs:
   rows=req('GET',f"/rest/v1/video_projects?id=eq.{j['project_id']}&select=*") or []
   if not rows:continue
-  p=rows[0];result=creative_preflight(p);report(p,j,'creative_preflight',result);patch('video_projects',p['id'],{'creative_score':result['score'],'updated_at':'now()'});step(p,'creative_preflight','passed' if result['passed'] else 'failed',f"Creative score {result['score']}/100. "+('; '.join(result['reasons']) if result['reasons'] else 'Hook, script structure, title, rhythm and originality passed.'))
+  p=rows[0]
+  try:p=prepare_longform(p)
+  except Exception as e:
+   reason='Long-form writer failed: '+str(e);patch('render_jobs',j['id'],{'status':'failed','error':reason,'completed_at':'now()','updated_at':'now()'});patch('video_projects',p['id'],{'status':'failed','failure_reason':reason,'updated_at':'now()'});continue
+  result=creative_preflight(p);report(p,j,'creative_preflight',result);patch('video_projects',p['id'],{'creative_score':result['score'],'updated_at':'now()'});step(p,'creative_preflight','passed' if result['passed'] else 'failed',f"Creative score {result['score']}/100. "+('; '.join(result['reasons']) if result['reasons'] else 'Hook, script structure, title, rhythm and originality passed.'))
   if not result['passed']:
    reason='Creative preflight failed: '+('; '.join(result['reasons']) or 'score below threshold');patch('render_jobs',j['id'],{'status':'failed','error':reason,'completed_at':'now()','updated_at':'now()'});patch('video_projects',p['id'],{'status':'failed','failure_reason':reason,'updated_at':'now()'})
 def download_output(obj,path):
