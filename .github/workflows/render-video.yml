@@ -19,11 +19,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: render-fleet-${{ github.run_id }}
+  cancel-in-progress: false
+
 jobs:
   render:
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: 8
       matrix:
         include:
           - worker: 1
@@ -34,6 +38,14 @@ jobs:
             voice: en_US-amy-medium
           - worker: 4
             voice: en_GB-alba-medium
+          - worker: 5
+            voice: en_US-lessac-medium
+          - worker: 6
+            voice: en_US-ryan-medium
+          - worker: 7
+            voice: en_US-amy-medium
+          - worker: 8
+            voice: en_GB-alba-medium
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -43,21 +55,32 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .piper-voices
-          key: piper-voice-pool-v2
+          key: piper-${{ matrix.voice }}-v2
 
-      - name: Restore visual search cache
+      - name: Restore shared visual search cache
         uses: actions/cache@v4
         with:
           path: .rolixa-cache
-          key: ${{ runner.os }}-motion-visual-v5-${{ github.run_id }}-${{ matrix.worker }}
+          key: ${{ runner.os }}-motion-visual-v6-${{ matrix.worker }}
           restore-keys: |
+            ${{ runner.os }}-motion-visual-v6-
             ${{ runner.os }}-motion-visual-v5-
 
-      - name: Install production renderer
+      - name: Install production renderer efficiently
+        shell: bash
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
-          python -m pip install --quiet piper-tts==1.6.0
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          if [ ! -f /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq fonts-dejavu-core
+          fi
+          python - <<'PY' || python -m pip install --quiet piper-tts==1.6.0
+          import piper
+          PY
 
       - name: Render and immediately publish only if publish-grade QC passes
         env:
