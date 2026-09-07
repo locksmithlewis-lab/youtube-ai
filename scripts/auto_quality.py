@@ -25,8 +25,7 @@ for p in rows:
         if str(p.get('format') or '').lower()=='clip':
             clips=req('GET',f"/rest/v1/clip_jobs?project_id=eq.{p['id']}&select=rights_confirmed,status,decision&order=created_at.desc&limit=1") or [];c=clips[0] if clips else {};ok=bool(c.get('rights_confirmed') and c.get('status')=='completed' and c.get('decision')=='accepted');detail='Authorized clip passed rights and quality checks.' if ok else 'Clip is waiting for accepted rights-confirmed scoring.'
         else:
-            rendered=bool(p.get('script') and p.get('output_url') and completed_render(p['id']));production=all(passed_step(p['id'],s) for s in ('voice','visuals','edit','creative_preflight','final_video_qc'));scores=Number if False else None
-            score_ok=float(p.get('creative_score') or 0)>=78 and float(p.get('quality_score') or 0)>=82;base=rendered and production and score_ok
+            rendered=bool(p.get('script') and p.get('output_url') and completed_render(p['id']));production=all(passed_step(p['id'],s) for s in ('voice','visuals','edit','creative_preflight','final_video_qc'));score_ok=float(p.get('creative_score') or 0)>=78 and float(p.get('quality_score') or 0)>=82;base=rendered and production and score_ok
             if is_factual(p):ok=base and verified_sources(p['id']);detail='Factual video passed creative, production, finished-MP4 and verified-source gates.' if ok else 'Factual video still needs verified evidence or a complete publish-grade QC pass.'
             else:ok=base;detail='Video passed creative, production and finished-MP4 QC.' if ok else 'Video is waiting for publish-grade creative/final-video approval.'
         if ok:
