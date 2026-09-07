@@ -1,0 +1,46 @@
+name: Full production audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '**.py'
+      - '**.js'
+      - '**.yml'
+      - '**.yaml'
+      - '**.html'
+      - 'scripts/repo_audit.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-production-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Python syntax review
+        run: python -m compileall -q scripts
+      - name: JavaScript syntax review
+        run: |
+          for f in $(find . -type f -name '*.js' -not -path './node_modules/*'); do
+            node --check "$f"
+          done
+      - name: YAML parse review
+        run: |
+          python -m pip install --quiet pyyaml
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+          for p in list(Path('.github/workflows').glob('*.yml'))+list(Path('.github/workflows').glob('*.yaml')):
+              yaml.safe_load(p.read_text())
+              print('YAML OK',p)
+          PY
+      - name: Line-by-line production risk review
+        run: python scripts/repo_audit.py
