@@ -1,0 +1,40 @@
+name: Performance feedback
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'api/sync-performance.js'
+      - 'scripts/performance_feedback.py'
+      - '.github/workflows/performance-feedback.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: performance-feedback
+  cancel-in-progress: false
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Sync real YouTube metrics
+        env:
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          curl --fail-with-body --retry 2 --max-time 900 \
+            -X POST 'https://riloxa-bey56lewis-4041.vercel.app/api/sync-performance' \
+            -H "Authorization: Bearer $SERVICE_KEY" \
+            -H 'Content-Type: application/json' \
+            --data '{}'
+      - name: Feed real results back into publishing priority
+        env:
+          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/performance_feedback.py
