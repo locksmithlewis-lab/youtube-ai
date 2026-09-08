@@ -102,6 +102,10 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/render_with_metrics.py | tee render.log
+          # A passing final MP4 intentionally lands in quality_check first.
+          # Run the existing server-side quality release so the database invariant
+          # moves only fully approved videos to ready before the publisher claims them.
+          python scripts/auto_quality.py
           PROJECT_ID=$(python - <<'PY'
           import re
           text=open('render.log',encoding='utf-8',errors='ignore').read()
