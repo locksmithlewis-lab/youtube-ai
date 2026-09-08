@@ -1,6 +1,6 @@
 import json, os, re, urllib.request
 from datetime import datetime, timezone
-from production_guard import creative_preflight
+from production_guard import creative_preflight, instruction_leaks
 
 SUPABASE_URL=os.environ.get('SUPABASE_URL','').rstrip('/');KEY=os.environ.get('SUPABASE_SERVICE_ROLE_KEY','')
 if not SUPABASE_URL or not KEY:raise SystemExit('Supabase secrets required.')
@@ -53,6 +53,8 @@ def fit_short_budget(sentences,high):
         if wc+n>high:break
         chosen.append(s);wc+=n
     return chosen
+def verified_sources(project_id):
+    return req('GET',f'/rest/v1/research_sources?project_id=eq.{project_id}&verified=eq.true&select=title,url,claim&limit=20') or []
 def repair_creative(p):
     original_script=str(p.get('script') or '')
     script=clean_script(original_script);title=clean_title(p.get('title'))
@@ -76,6 +78,11 @@ for p in rows:
     if attempts>=2:
         report(p,False,0,['automatic repair limit reached'],{'previous_failure':reason,'attempts':attempts});discarded+=1;continue
     now=datetime.now(timezone.utc).isoformat()
+    leaks=instruction_leaks(str(p.get('script') or ''))
+    if leaks:
+        sources=verified_sources(p['id'])
+        report(p,False,10,['instruction-script quarantined; automatic trimming is forbidden because it is not narration','verified research required before factual rewrite'],{'previous_failure':reason,'instruction_leaks':leaks[:8],'verified_source_count':len(sources)})
+        waiting+=1;continue
     if any(x in reason for x in creative_faults) and not any(x in reason for x in nonmechanical):
         candidate,result=repair_creative(p)
         if result['passed']:
