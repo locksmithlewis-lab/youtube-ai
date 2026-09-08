@@ -11,6 +11,7 @@ on:
       - 'scripts/longform_writer.py'
       - 'scripts/generative_video.py'
       - 'scripts/sitecustomize.py'
+      - 'scripts/production_guard.py'
       - 'api/auto-publish-ready.js'
       - '.github/workflows/render-video.yml'
   schedule:
@@ -33,7 +34,7 @@ jobs:
           - worker: 1
             voice: en_US-lessac-medium
           - worker: 2
-            voice: en_US-ryan-medium
+            voice: en_GB-alba-medium
           - worker: 3
             voice: en_US-amy-medium
           - worker: 4
@@ -41,7 +42,7 @@ jobs:
           - worker: 5
             voice: en_US-lessac-medium
           - worker: 6
-            voice: en_US-ryan-medium
+            voice: en_US-amy-medium
           - worker: 7
             voice: en_US-amy-medium
           - worker: 8
@@ -102,9 +103,6 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/render_with_metrics.py | tee render.log
-          # A passing final MP4 intentionally lands in quality_check first.
-          # Run the existing server-side quality release so the database invariant
-          # moves only fully approved videos to ready before the publisher claims them.
           python scripts/auto_quality.py
           PROJECT_ID=$(python - <<'PY'
           import re
