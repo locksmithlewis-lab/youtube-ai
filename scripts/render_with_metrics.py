@@ -54,22 +54,29 @@ def integrity_intervals(path):
  for m in re.finditer(r'black_start:([0-9.]+)\s+black_end:([0-9.]+)\s+black_duration:([0-9.]+)',text):
   a,b,d=map(float,m.groups())
   if d>.7:black.append((max(0,a-.08),b+.08))
- starts=[float(x) for x in re.findall(r'freeze_start:\s*([0-9.]+)',text)];ends=[float(x) for x in re.findall(r'freeze_end:\s*([0-9.]+)',text)]
- for a,b in zip(starts,ends):
-  if b-a>1.8:freeze.append((max(0,a-.08),b+.08))
+ starts=[float(x) for x in re.findall(r'freeze_start:\s*([0-9.]+)',text)]
+ durations=[float(x) for x in re.findall(r'freeze_duration:\s*([0-9.]+)',text)]
+ for a,d in zip(starts,durations):
+  if d>1.8:freeze.append((max(0,a-.08),a+d+.08))
+ if len(freeze)<len(starts):
+  ends=[float(x) for x in re.findall(r'freeze_end:\s*([0-9.]+)',text)]
+  for a,b in zip(starts,ends):
+   if b-a>1.8:
+    item=(max(0,a-.08),b+.08)
+    if item not in freeze:freeze.append(item)
  return black,freeze
 def interval_expr(intervals):return '+'.join(f'between(t,{a:.3f},{b:.3f})' for a,b in intervals) or '0'
 def repair_integrity(src,dst):
  black,freeze=integrity_intervals(src)
  if not black and not freeze:return False,{'black':0,'freeze':0}
- w,h=video_size(src);dur=media_duration(src);layers=[];inputs=['-i',str(src)];chains=[];prev='0:v';idx=1
+ w,h=video_size(src);dur=media_duration(src);inputs=['-i',str(src)];chains=[];prev='0:v';idx=1
  if freeze:
   inputs += ['-f','lavfi','-i',f'color=c=0x29425e:s={w}x{h}:r=30:d={dur:.3f}']
-  chains.append(f'[{idx}:v]noise=alls=8:allf=t+u,drawgrid=w=96:h=96:t=2:c=white@0.07,drawbox=x=-260+mod(t*220\,{w+520}):y={int(h*.18)}:w=260:h=18:c=white@0.22:t=fill,drawbox=x={int(w*.12)}+45*sin(t*1.7):y={int(h*.55)}+55*cos(t*1.1):w={int(w*.24)}:h={int(h*.10)}:c=white@0.10:t=fill,format=rgba,colorchannelmixer=aa=0.34[rf]')
+  chains.append(f'[{idx}:v]noise=alls=8:allf=t+u,drawgrid=w=96:h=96:t=2:c=white@0.07,drawbox=x={int(w*.10)}+{int(w*.18)}*sin(t*1.9):y={int(h*.18)}:w={int(w*.24)}:h={max(18,int(h*.012))}:c=white@0.22:t=fill,drawbox=x={int(w*.58)}+{int(w*.12)}*cos(t*1.5):y={int(h*.55)}+{int(h*.05)}*sin(t*1.1):w={int(w*.24)}:h={int(h*.10)}:c=white@0.10:t=fill,format=rgba,colorchannelmixer=aa=0.34[rf]')
   chains.append(f'[{prev}][rf]overlay=shortest=1:enable=\'{interval_expr(freeze)}\'[v{idx}]');prev=f'v{idx}';idx+=1
  if black:
   inputs += ['-f','lavfi','-i',f'color=c=0x29425e:s={w}x{h}:r=30:d={dur:.3f}']
-  chains.append(f'[{idx}:v]noise=alls=9:allf=t+u,drawgrid=w=110:h=110:t=2:c=white@0.08,drawbox=x=-300+mod(t*250\,{w+600}):y={int(h*.35)}:w=300:h=24:c=white@0.25:t=fill,format=rgba,colorchannelmixer=aa=0.96[rb]')
+  chains.append(f'[{idx}:v]noise=alls=9:allf=t+u,drawgrid=w=110:h=110:t=2:c=white@0.08,drawbox=x={int(w*.08)}+{int(w*.20)}*sin(t*2.1):y={int(h*.35)}:w={int(w*.28)}:h={max(24,int(h*.015))}:c=white@0.25:t=fill,format=rgba,colorchannelmixer=aa=0.96[rb]')
   chains.append(f'[{prev}][rb]overlay=shortest=1:enable=\'{interval_expr(black)}\'[v{idx}]');prev=f'v{idx}';idx+=1
  cmd=['ffmpeg','-y']+inputs+['-filter_complex',';'.join(chains),'-map',f'[{prev}]','-map','0:a?','-c:v','libx264','-preset','veryfast','-crf','19','-pix_fmt','yuv420p','-c:a','copy','-movflags','+faststart',str(dst)]
  subprocess.run(cmd,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);return True,{'black':len(black),'freeze':len(freeze)}
