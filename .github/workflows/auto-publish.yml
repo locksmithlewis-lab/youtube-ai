@@ -52,6 +52,7 @@ jobs:
           SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           test -n "$SERVICE_KEY"
+          echo "Starting publish drain for all ready, QC-cleared videos."
           for pass in $(seq 1 20); do
             echo "Publish pass $pass"
             RESPONSE=$(curl --fail-with-body --retry 2 --max-time 840 \
