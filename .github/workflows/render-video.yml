@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/render_video.py'
       - 'scripts/render_with_metrics.py'
+      - 'scripts/media_integrity.py'
       - 'scripts/visual_sources.py'
       - 'scripts/longform_writer.py'
       - 'scripts/generative_video.py'
@@ -21,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: render-fleet-${{ github.run_id }}
+  group: render-fleet-main
   cancel-in-progress: false
 
 jobs:
