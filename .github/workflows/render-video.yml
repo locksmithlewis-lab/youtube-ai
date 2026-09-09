@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/render_video.py'
       - 'scripts/render_with_metrics.py'
+      - 'scripts/storage_upload.py'
       - 'scripts/media_integrity.py'
       - 'scripts/visual_sources.py'
       - 'scripts/longform_writer.py'
@@ -95,6 +96,7 @@ jobs:
           ROLIXA_WRITER_MODEL: gpt-5.6
           GENERATIVE_VIDEO_ENABLED: '1'
           GENERATIVE_VIDEO_PERCENT: '25'
+          ROLIXA_VIDEO_BUCKET_SOFT_LIMIT: '100663296'
           PYTHONPATH: scripts
           PIPER_VOICE: ${{ matrix.voice }}
           PIPER_VOICE_DIR: .piper-voices
