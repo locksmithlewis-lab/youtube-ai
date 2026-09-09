@@ -15,6 +15,9 @@ def req(method,path,data=None,prefer=None):
 def patch(table,id,payload):return req('PATCH',f'/rest/v1/{table}?id=eq.{id}',payload,'return=minimal')
 def report(p,passed,score,reasons,metrics=None):
     return req('POST','/rest/v1/video_quality_reports',{'user_id':p['user_id'],'project_id':p['id'],'stage':'repair_controller','passed':passed,'score':score,'reasons':reasons,'metrics':metrics or {}},'return=minimal')
+def series_membership(project_id):
+    rows=req('GET',f'/rest/v1/series_episodes?video_project_id=eq.{project_id}&select=series_id,episode_number&limit=1') or []
+    return rows[0] if rows else None
 def clean_title(title):
     title=re.sub(r'(?i)^\s*(?:signature|showcase)\s*\d+\s*[—:\-]\s*','',str(title or '')).strip()
     return title or 'Untold Story'
@@ -69,11 +72,15 @@ def repair_creative(p):
     return candidate,result
 
 rows=req('GET','/rest/v1/video_projects?status=eq.failed&select=*&order=updated_at.asc&limit=100') or []
-repairable=('visual','motion','image','provider','download','429','403','timeout','ffmpeg','decode','audio','silence','freeze','black frame','render','size validation')
+repairable=('visual','motion','image','provider','download','429','403','timeout','ffmpeg','decode','duration','audio','silence','freeze','black frame','render','size validation','storage')
 creative_faults=('script too','production directions','template phrasing','narrative beats','opening hook','generic batch title','sentences start the same way','sentence rhythm','vocabulary is too repetitive')
 nonmechanical=('factual','verified evidence')
-requeued=rewritten=discarded=waiting=0
+requeued=rewritten=discarded=waiting=series_owned=0
 for p in rows:
+    membership=series_membership(p['id'])
+    if membership:
+        report(p,False,50,['series-linked failure is owned by the ordered continuity controller'],{'series_id':membership.get('series_id'),'episode_number':membership.get('episode_number'),'previous_failure':p.get('failure_reason')})
+        waiting+=1;series_owned+=1;continue
     reason=str(p.get('failure_reason') or '').lower();attempts=int(p.get('qc_attempts') or 0)
     if attempts>=2:
         report(p,False,0,['automatic repair limit reached'],{'previous_failure':reason,'attempts':attempts});discarded+=1;continue
@@ -95,4 +102,4 @@ for p in rows:
     if not any(x in reason for x in repairable):
         report(p,False,30,['failure is not safely auto-repairable'],{'previous_failure':reason,'attempts':attempts});waiting+=1;continue
     patch('video_projects',p['id'],{'status':'generating','output_url':None,'scheduled_publish_at':None,'failure_reason':f'Automatic repair attempt {attempts+1}: rebuilding failed media/edit components.','qc_attempts':attempts+1,'updated_at':now});req('POST','/rest/v1/render_jobs',{'user_id':p['user_id'],'project_id':p['id'],'engine':'motion-first-repair','status':'queued'},'return=minimal');report(p,True,60,['repairable failure requeued'],{'previous_failure':reason,'attempt':attempts+1});requeued+=1
-print(json.dumps({'failed_checked':len(rows),'requeued':requeued,'creative_rewritten':rewritten,'rewrite_needed':waiting,'repair_limit_reached':discarded}))
+print(json.dumps({'failed_checked':len(rows),'requeued':requeued,'creative_rewritten':rewritten,'rewrite_needed':waiting,'repair_limit_reached':discarded,'series_owned':series_owned}))
