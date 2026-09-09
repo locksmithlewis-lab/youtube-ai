@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/auto_quality.py'
       - 'scripts/repair_failed.py'
+      - 'scripts/series_reconcile.py'
       - 'scripts/production_guard.py'
       - '.github/workflows/auto-quality.yml'
   schedule:
@@ -25,7 +26,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - name: Repair safely recoverable failed renders
+      - name: Reconcile and repair ordered series
+        env:
+          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/series_reconcile.py
+      - name: Repair safely recoverable non-series failures
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
