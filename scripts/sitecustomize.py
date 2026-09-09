@@ -44,3 +44,8 @@ if os.environ.get('GENERATIVE_VIDEO_ENABLED','1')!='0':
    return _original_choose(plan,used,min_score,used_providers)
   _v.choose=_generated_choose
  except Exception as e:print('Generative video startup unavailable:',str(e)[:240])
+
+try:
+ from storage_upload import install_legacy_urllib_transport as _install_storage_transport
+ _install_storage_transport()
+except Exception as e:print('Resumable storage transport unavailable:',str(e)[:240])
