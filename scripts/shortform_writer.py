@@ -17,15 +17,30 @@ def _words(text):
     return re.findall(r"[A-Za-z0-9']+",str(text or ''))
 
 
+def _is_fictional(project):
+    """Return True only when the project is explicitly story/fiction oriented.
+
+    Fiction should never be forced through factual-source validation.  We keep
+    this deliberately conservative so explainers/news/gaming facts still need
+    public support.
+    """
+    fmt=str(project.get('format') or '').strip().lower()
+    if fmt in ('story','fiction','fictional','narrative'):
+        return True
+    fields=('content_type','type','category','genre','style')
+    text=' '.join(str(project.get(key) or '') for key in fields).lower()
+    return bool(re.search(r'\b(fiction|fictional|story|narrative|screenplay|short story)\b',text))
+
+
 def needs_script(project):
     fmt=str(project.get('format') or '').lower()
     target=int(project.get('target_duration_seconds') or 60)
-    if fmt not in ('short','shorts','story') or target>120:
+    if fmt not in ('short','shorts','story','fiction','fictional','narrative') or target>120:
         return False
     script=str(project.get('script') or '').strip()
     hook=str(project.get('hook') or '').strip()
     low=script.lower()
-    weak_hook=(len(_words(hook))<5 or len(_words(hook))>18 or not re.search(r'(?i)(\?|\bwhy\b|\bhow\b|\bbut\b|\bproblem\b|\bcost\b|\bpaid\b|\bsuddenly\b|\bhidden\b|\bchanged\b)',hook))
+    weak_hook=(len(_words(hook))<5 or len(_words(hook))>18 or not re.search(r'(?i)(\?|\bwhy\b|\bhow\b|\bbut\b|\bproblem\b|\bcost\b|\bpaid\b|\bsuddenly\b|\bhidden\b|\bchanged\b|\bnever\b|\buntil\b|\bdoor\b|\bvoice\b|\bfound\b)',hook))
     return len(_words(script))<55 or any(marker in low for marker in GENERIC_MARKERS) or weak_hook
 
 
@@ -70,15 +85,62 @@ def _compact_claim(sentence,index):
 
 def _make_hook(project,topic):
     current=re.sub(r'\s+',' ',str(project.get('hook') or '')).strip()
-    if 5<=len(_words(current))<=18 and re.search(r'(?i)(\?|\bwhy\b|\bhow\b|\bbut\b|\bproblem\b|\bcost\b|\bpaid\b|\bsuddenly\b|\bhidden\b|\bchanged\b)',current):
+    if 5<=len(_words(current))<=18 and re.search(r'(?i)(\?|\bwhy\b|\bhow\b|\bbut\b|\bproblem\b|\bcost\b|\bpaid\b|\bsuddenly\b|\bhidden\b|\bchanged\b|\bnever\b|\buntil\b|\bdoor\b|\bvoice\b|\bfound\b)',current):
         return current
     return f'Why does {topic} matter more than the headline makes it seem?'
+
+
+def _fiction_hook(project,topic):
+    current=re.sub(r'\s+',' ',str(project.get('hook') or '')).strip()
+    if 5<=len(_words(current))<=18:
+        return current
+    clean=re.sub(r'\s+',' ',topic).strip().rstrip('.!?')
+    return f'Everything felt normal until {clean} stopped making sense.'
+
+
+def _fiction_seed(project,topic):
+    for key in ('description','concept','prompt','summary','premise'):
+        value=re.sub(r'\s+',' ',str(project.get(key) or '')).strip()
+        if len(_words(value))>=6:
+            return value
+    return topic
+
+
+def _write_fiction(project,topic):
+    """Create original spoken narration without pretending fiction has sources."""
+    hook=_fiction_hook(project,topic)
+    seed=_fiction_seed(project,topic)
+    seed_words=_words(seed)
+    focus=' '.join(seed_words[:18]) if seed_words else topic
+    beats=[
+        f'At first, {focus} seemed like the kind of detail anyone could ignore.',
+        'Then one small inconsistency appeared, and every easy explanation started falling apart.',
+        'The closer the character looked, the more the ordinary details began pointing in the same impossible direction.',
+        'A choice that should have been harmless suddenly carried a consequence nobody had warned them about.',
+        'By the time the truth became visible, turning back would have meant losing the only chance to understand it.',
+    ]
+    closing='And that was when the real story began.'
+    script=' '.join([hook]+beats+[closing])
+    if len(_words(script))>128:
+        script=' '.join(_words(script)[:126])+'.'
+    title=str(project.get('title') or topic).strip()[:78]
+    return {
+        'script':script,
+        'hook':hook,
+        'title':title,
+        'word_count':len(_words(script)),
+        'model':'original-fiction-retention-writer-v1',
+        'source':None,
+        'fictional':True,
+    }
 
 
 def write(project):
     topic=str(project.get('topic') or project.get('title') or '').strip()
     if len(_words(topic))<2:
-        raise RuntimeError('Short topic is too vague to source and write automatically.')
+        raise RuntimeError('Short topic is too vague to write automatically.')
+    if _is_fictional(project):
+        return _write_fiction(project,topic)
     source=_source(topic)
     source_sentences=_sentences(source['extract'])
     hook=_make_hook(project,topic)
@@ -105,4 +167,5 @@ def write(project):
         'word_count':len(_words(script)),
         'model':'source-backed-retention-writer-v2',
         'source':source,
+        'fictional':False,
     }
