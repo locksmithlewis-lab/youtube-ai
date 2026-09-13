@@ -27,14 +27,36 @@ HEADERS = {
 W, H = 1080, 1920
 
 
-def request(method, path, data=None, extra=None):
+def _is_tls_handshake_reset(exc):
+    reason = getattr(exc, 'reason', None)
+    if not isinstance(reason, ConnectionResetError):
+        return False
+    trace = reason.__traceback__
+    while trace:
+        frame = trace.tb_frame
+        if frame.f_code.co_name == 'do_handshake' and frame.f_code.co_filename.endswith('/ssl.py'):
+            return True
+        trace = trace.tb_next
+    return False
+
+
+def request(method, path, data=None, extra=None, retry_tls_connect_reset=False):
     body = None if data is None else json.dumps(data).encode()
     headers = dict(HEADERS)
     headers.update(extra or {})
-    req = urllib.request.Request(SUPABASE_URL + path, data=body, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=90) as response:
-        raw = response.read()
-        return json.loads(raw.decode()) if raw else None
+    attempts = 3 if retry_tls_connect_reset else 1
+    for attempt in range(attempts):
+        req = urllib.request.Request(SUPABASE_URL + path, data=body, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=90) as response:
+                raw = response.read()
+                return json.loads(raw.decode()) if raw else None
+        except urllib.error.URLError as exc:
+            if not _is_tls_handshake_reset(exc) or attempt == attempts - 1:
+                raise
+            delay = attempt + 1
+            print(f'Supabase TLS handshake reset; retrying claim in {delay}s.', flush=True)
+            time.sleep(delay)
 
 
 def patch(table, item_id, payload):
@@ -98,7 +120,12 @@ def human_check(script, longform=False):
 
 
 def claim():
-    rows = request('POST', '/rest/v1/rpc/claim_next_render_job', {}) or []
+    rows = request(
+        'POST',
+        '/rest/v1/rpc/claim_next_render_job',
+        {},
+        retry_tls_connect_reset=True,
+    ) or []
     return rows[0] if rows else None
 
 
