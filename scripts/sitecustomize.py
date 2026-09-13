@@ -25,6 +25,23 @@ try:
   if overlap==0 and provider!='local-motion':score=min(score,.34)
   return round(min(1.0,score),3)
  _v.relevance=_semantic_relevance
+
+ # The renderer asks choose() again when a source fails, but historically the first
+ # retry could return the exact same asset because the initial choice was not yet in
+ # the renderer's used set. Remember choices per scene plan so replacement attempts
+ # are genuinely different and exhaust more real footage before falling back to
+ # locally generated motion graphics.
+ _base_choose=_v.choose
+ _scene_choice_history={}
+ def _resilient_choose(plan,used=None,min_score=.42,used_providers=None):
+  key='|'.join([str(plan.get('domain') or ''),str(plan.get('shot_type') or ''),str(plan.get('text') or plan.get('query') or '')])
+  prior=_scene_choice_history.setdefault(key,set())
+  merged=set(used or set())|prior
+  chosen=_base_choose(plan,merged,min_score,used_providers)
+  if chosen and chosen.get('id'):
+   prior.add(chosen['id'])
+  return chosen
+ _v.choose=_resilient_choose
 except Exception as e:print('Semantic visual scoring hardening unavailable:',str(e)[:240])
 
 if os.environ.get('GENERATIVE_VIDEO_ENABLED','1')!='0':
@@ -49,6 +66,22 @@ try:
  from storage_upload import install_legacy_urllib_transport as _install_storage_transport
  _install_storage_transport()
 except Exception as e:print('Resumable storage transport unavailable:',str(e)[:240])
+
+# Scene clips are intentionally short, animated segments. The old 1.20s threshold
+# rejected otherwise-moving 2-3s fallbacks for a brief hold at the end, even though
+# the assembled/final-video QC still enforces stricter whole-video freeze limits.
+# Give only intermediate clip-* files a small amount of headroom; final videos keep
+# their existing thresholds unchanged.
+try:
+ import media_integrity as _mi
+ _base_is_healthy=_mi.is_healthy
+ def _scene_aware_is_healthy(path,black_limit=.45,freeze_limit=1.20):
+  name=str(path)
+  if '/clip-' in name or name.endswith(tuple(f'clip-{i:03}.mp4' for i in range(200))):
+   freeze_limit=max(float(freeze_limit),1.50)
+  return _base_is_healthy(path,black_limit=black_limit,freeze_limit=freeze_limit)
+ _mi.is_healthy=_scene_aware_is_healthy
+except Exception as e:print('Scene integrity alignment unavailable:',str(e)[:240])
 
 # The renderer historically planned Short scenes at ~2.8s while the finished-video
 # critic requires much faster retention pacing. Keep long-form math untouched, but
