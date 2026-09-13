@@ -9,6 +9,7 @@ on:
       - 'scripts/repair_failed.py'
       - 'scripts/series_controller.py'
       - 'scripts/production_guard.py'
+      - 'scripts/production_watchdog.py'
       - '.github/workflows/auto-quality.yml'
   schedule:
     - cron: '*/5 * * * *'
@@ -23,7 +24,7 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v5
       - name: Reconcile and repair ordered series
@@ -41,3 +42,14 @@ jobs:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python scripts/auto_quality.py
+      - name: Run production watchdog and recover stuck jobs
+        env:
+          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ROLIXA_MAX_IDLE_HOURS: '24'
+          ROLIXA_MIN_READY_BACKLOG: '3'
+          ROLIXA_STUCK_GENERATING_HOURS: '1.5'
+          ROLIXA_MAX_STUCK_REQUEUES: '8'
+          ROLIXA_WATCHDOG_FAIL_ON_STALL: '0'
+          PYTHONPATH: scripts
+        run: python scripts/production_watchdog.py
