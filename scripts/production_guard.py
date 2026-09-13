@@ -24,6 +24,16 @@ WEAK_PHRASES = [
     'this is the moment where a normal upload turns into',
     'nobody knows what happens next',
 ]
+SHORT_PREAMBLE_PATTERNS = [
+    r'(?i)^\s*(?:hey|hi|hello|welcome|welcome back|today we(?: are|\'re)? going to|in this video|in this short|let\'s talk about)\b',
+    r'(?i)^\s*(?:before we begin|first of all|so basically|you guys)\b',
+]
+SHORT_HOOK_SIGNAL = re.compile(
+    r'(?i)(\?|\bwhy\b|\bhow\b|\bbut\b|\binstead\b|\bactually\b|\bnever\b|\bsecret\b|\bproblem\b|\bcost\b|\bpaid\b|\bmillions?\b|\bsuddenly\b|\bwrong\b|\bchanged\b|\bfailed\b|\bhidden\b|\breal reason\b)'
+)
+AUDIENCE_TOPIC_SIGNAL = re.compile(
+    r'(?i)\b(game|gaming|gta|playstation|xbox|nintendo|switch|steam|pc|console|harry potter|dragon ball|anime|movie|series|franchise|retro|nostalgia|remake|sequel|price|paid|industry|studio|developer|publisher|streaming|entertainment)\b'
+)
 
 
 def sentences(text):
@@ -36,6 +46,12 @@ def sentences(text):
 
 def words(text):
     return re.findall(r"[A-Za-z0-9']+", str(text or '').lower())
+
+
+def _is_short(project):
+    target = int(project.get('target_duration_seconds') or 60)
+    fmt = str(project.get('format') or '').lower()
+    return target <= 120 and fmt not in ('long', 'longform', 'full', 'youtube', 'youtube video', 'full video', 'long form', 'long-form')
 
 
 def _target_words(project):
@@ -53,6 +69,46 @@ def instruction_leaks(script):
         if match:
             found.append(match.group(0))
     return found
+
+
+def _short_retention_checks(project, script, hook, title, sentence_list):
+    reasons = []
+    penalties = 0.0
+    hard = False
+    first = sentence_list[0] if sentence_list else hook
+    first_words = words(first)
+    opening = hook or first
+
+    if any(re.search(pattern, opening) for pattern in SHORT_PREAMBLE_PATTERNS):
+        reasons.append('Short opens with greeting/setup instead of immediate value')
+        penalties += 35
+        hard = True
+    if len(first_words) > 18:
+        reasons.append(f'first spoken beat is too long ({len(first_words)} words); target <=18')
+        penalties += 18
+    if len(words(opening)) > 20:
+        reasons.append('hook is too long for the first 1-2 seconds')
+        penalties += 12
+    if opening and not SHORT_HOOK_SIGNAL.search(opening):
+        reasons.append('opening lacks a clear conflict, surprise, question, or curiosity signal')
+        penalties += 18
+    if hook and first and len(set(words(hook)) & set(words(first))) < max(2, min(5, len(words(hook)) // 3)):
+        reasons.append('stored hook does not match the actual first spoken beat')
+        penalties += 12
+
+    combined = f'{title} {project.get("topic") or ""} {hook}'
+    audience_fit = bool(AUDIENCE_TOPIC_SIGNAL.search(combined))
+    if not audience_fit:
+        reasons.append('topic has weak fit for current core audience: gaming/entertainment, adult nostalgia, franchise, price or industry angles')
+        penalties += 10
+
+    # Shorts-feed dominant channels need a payoff teased immediately, not held for a long setup.
+    first_two = ' '.join(sentence_list[:2])
+    if len(words(first_two)) > 34:
+        reasons.append('opening two beats delay the payoff too long')
+        penalties += 10
+
+    return reasons, penalties, hard, audience_fit
 
 
 def creative_preflight(project):
@@ -128,8 +184,15 @@ def creative_preflight(project):
         reasons.append('vocabulary is too repetitive')
         score -= 8
 
+    short_hard = False
+    audience_fit = None
+    if _is_short(project):
+        short_reasons, short_penalty, short_hard, audience_fit = _short_retention_checks(project, script, hook, title, sentence_list)
+        reasons.extend(short_reasons)
+        score -= short_penalty
+
     score = max(0, round(score, 1))
-    hard_block = leaked or bool(leaks) or too_short or too_dense
+    hard_block = leaked or bool(leaks) or too_short or too_dense or short_hard
     return {
         'passed': score >= 78 and not hard_block,
         'score': score,
@@ -139,6 +202,9 @@ def creative_preflight(project):
             'title_words': len(words(title)), 'duplicate_sentence_ratio': round(duplicate_ratio, 3),
             'target_word_range': [low, high], 'instruction_leak_count': len(leaks),
             'hard_blocked_for_density': too_dense, 'hard_blocked_for_length': too_short,
+            'short_retention_rules_applied': _is_short(project),
+            'short_audience_fit': audience_fit,
+            'first_beat_words': len(words(sentence_list[0])) if sentence_list else 0,
         },
     }
 
@@ -232,6 +298,12 @@ def final_video_qc(path, project, assets):
         reasons.append(f'unplanned silence {detect["max_silence_seconds"]:.1f}s')
         score -= 15
 
+    if not longform and assets:
+        avg_scene = dur / len(assets)
+        if avg_scene > 2.15:
+            reasons.append(f'visual changes average every {avg_scene:.1f}s; Shorts target is <=2.15s')
+            score -= 20
+
     score = max(0, round(score, 1))
     metrics = {
         'duration_seconds': round(dur, 2), 'size_bytes': size,
@@ -239,6 +311,7 @@ def final_video_qc(path, project, assets):
         'image_ratio': round(image_ratio, 3), 'provider_count': providers,
         'average_semantic_relevance': round(avg_rel, 3),
         'weak_semantic_scene_ratio': round(low_rel_ratio, 3), **detect,
+        'average_seconds_per_visual_change': round(dur / max(1, len(assets)), 3),
     }
     return {'passed': score >= 82 and not reasons, 'score': score, 'reasons': reasons, 'metrics': metrics}
 
