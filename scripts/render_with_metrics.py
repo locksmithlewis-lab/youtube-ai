@@ -130,10 +130,23 @@ def download_output(obj, path):
             handle.write(chunk)
 
 
-def upload(path, bucket, obj, mime):
+def upload(path, bucket, obj, mime, replace=False):
+    """Upload a new object or explicitly replace an existing one.
+
+    The raw renderer creates video-outputs/{obj} first. Final QC then masters that
+    same object. Using POST for the second write can return 409 Resource Already
+    Exists even with x-upsert on some Storage paths, so mastered videos use PUT.
+    """
     url = URL + f'/storage/v1/object/{bucket}/' + urllib.parse.quote(obj, safe='/')
+    headers = {
+        'apikey': KEY,
+        'Authorization': f'Bearer {KEY}',
+        'Content-Type': mime,
+        'x-upsert': 'true',
+    }
+    method = 'PUT' if replace else 'POST'
     with open(path, 'rb') as handle:
-        request = urllib.request.Request(url, data=handle.read(), headers={'apikey': KEY, 'Authorization': f'Bearer {KEY}', 'Content-Type': mime, 'x-upsert': 'true'}, method='POST')
+        request = urllib.request.Request(url, data=handle.read(), headers=headers, method=method)
         urllib.request.urlopen(request, timeout=600).read()
 
 
@@ -175,7 +188,7 @@ def post_render_qc(project_id, job_id, obj):
             result=final_video_qc(master,project,assets); report(project,job,'final_video_qc',result)
             if not result['passed']:
                 reason='Final video QC failed: '+'; '.join(result['reasons']); patch('video_projects',project['id'],{'quality_score':result['score'],'status':'failed','output_url':None,'failure_reason':reason,'updated_at':'now()'}); patch('render_jobs',job['id'],{'status':'failed','error':reason,'updated_at':'now()'}); step(project,'final_video_qc','failed',f"Finished-video score {result['score']}/100. "+'; '.join(result['reasons'])); raise RuntimeError(reason)
-            upload(master,'video-outputs',obj,'video/mp4'); thumb_obj=None
+            upload(master,'video-outputs',obj,'video/mp4',replace=True); thumb_obj=None
             if longform:
                 thumb=Path(temp_dir)/'thumbnail.jpg'; make_thumbnail(master,project.get('title'),thumb); thumb_obj=f"{project['user_id']}/{project['id']}/{job_id}.jpg"; upload(thumb,'video-thumbnails',thumb_obj,'image/jpeg'); step(project,'thumbnail','passed','Generated a custom 16:9 thumbnail from the finished video with concise title treatment.')
             creative=float(project.get('creative_score') or 0); priority=publication_priority(project,creative,result['score']); payload={'quality_score':result['score'],'publication_priority':priority,'status':'quality_check','failure_reason':None,'updated_at':'now()'}
