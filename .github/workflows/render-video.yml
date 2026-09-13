@@ -18,6 +18,12 @@ on:
       - '.github/workflows/render-video.yml'
   schedule:
     - cron: '*/5 * * * *'
+  # GitHub cron delivery can be delayed. Auto quality already runs every five
+  # minutes, so its completion gives the render fleet a second independent
+  # kick without needing another secret or an external scheduler.
+  workflow_run:
+    workflows: ['Auto quality gate']
+    types: [completed]
 
 permissions:
   contents: read
