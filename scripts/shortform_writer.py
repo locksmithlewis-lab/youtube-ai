@@ -26,6 +26,11 @@ def _is_fictional(project):
     return bool(re.search(r'\b(fiction|fictional|story|narrative|screenplay|short story)\b',text))
 
 
+def _target_min_words(project):
+    target=max(1,int(project.get('target_duration_seconds') or 60))
+    return max(55,int(target*1.7))
+
+
 def needs_script(project):
     fmt=str(project.get('format') or '').lower()
     target=int(project.get('target_duration_seconds') or 60)
@@ -35,7 +40,7 @@ def needs_script(project):
     hook=str(project.get('hook') or '').strip()
     low=script.lower()
     weak_hook=(len(_words(hook))<5 or len(_words(hook))>18 or not re.search(r'(?i)(\?|\bwhy\b|\bhow\b|\bbut\b|\bproblem\b|\bcost\b|\bpaid\b|\bsuddenly\b|\bhidden\b|\bchanged\b|\bnever\b|\buntil\b|\bdoor\b|\bvoice\b|\bfound\b)',hook))
-    return len(_words(script))<55 or any(marker in low for marker in GENERIC_MARKERS) or weak_hook
+    return len(_words(script))<_target_min_words(project) or any(marker in low for marker in GENERIC_MARKERS) or weak_hook
 
 
 def _source(topic):
@@ -129,14 +134,25 @@ def _write_fiction(project,topic):
         'They followed it, and the place behind them locked shut.',
     ]
     closing='That decision changed what the group thought the mystery was really about.'
+    target_min=_target_min_words(project)
+    padding=[
+        f'One overlooked detail in {location} made the danger feel deliberate rather than accidental.',
+        f'Worse, the clue tied {consequence} to a consequence nobody in the group had prepared for.',
+        f'By then, {protagonist} could no longer treat the discovery as a coincidence.',
+    ]
     script=' '.join([hook]+beats+[closing])
+    for beat in padding:
+        if len(_words(script))>=target_min:
+            break
+        beats.append(beat)
+        script=' '.join([hook]+beats+[closing])
     title=str(project.get('title') or topic).strip()[:78]
     return {
         'script':script,
         'hook':hook,
         'title':title,
         'word_count':len(_words(script)),
-        'model':'original-fiction-retention-writer-v2',
+        'model':'original-fiction-retention-writer-v3',
         'source':None,
         'fictional':True,
     }
@@ -151,26 +167,29 @@ def write(project):
     source=_source(topic)
     source_sentences=_sentences(source['extract'])
     hook=_make_hook(project,topic)
+    closing=f'That is the part of {topic} the headline alone does not explain.'
+    desired=_target_min_words(project)
+    closing_words=len(_words(closing))
     claims=[]
     total=len(_words(hook))
-    for sentence in source_sentences[:10]:
+    soft_cap=max(118,desired+28)
+    for sentence in source_sentences[:12]:
         claim=_compact_claim(sentence,len(claims))
         n=len(_words(claim))
-        if claims and total+n>118:
+        if claims and total+n+closing_words>soft_cap:
             break
         claims.append(claim);total+=n
-        if total>=82 and len(claims)>=4:
+        if total+closing_words>=desired and len(claims)>=4:
             break
-    if len(claims)<4 or total<65:
-        raise RuntimeError('Source could not support enough distinct narration beats for a publishable Short.')
-    closing=f'That is the part of {topic} the headline alone does not explain.'
+    if len(claims)<4 or total+closing_words<desired:
+        raise RuntimeError(f'Source could not support the {desired}-word publish-grade narration floor for this Short.')
     script=' '.join([hook]+claims+[closing])
     return {
         'script':script,
         'hook':hook,
         'title':str(project.get('title') or f'{topic}: The Detail Most People Miss').strip()[:78],
         'word_count':len(_words(script)),
-        'model':'source-backed-retention-writer-v2',
+        'model':'source-backed-retention-writer-v3',
         'source':source,
         'fictional':False,
     }
