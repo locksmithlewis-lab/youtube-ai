@@ -1,4 +1,4 @@
-import json, os, re, urllib.request
+import json, os, re, urllib.request, urllib.parse
 from datetime import datetime, timezone
 from production_guard import creative_preflight, instruction_leaks
 from shortform_writer import write as write_shortform
@@ -65,12 +65,12 @@ def writer_rewrite(p):
         candidate=dict(p,title=made['title'],script=made['script'],hook=made['hook'])
         source=made.get('source') or {}
         if source.get('url'):
-            existing=req('GET',f"/rest/v1/research_sources?project_id=eq.{p['id']}&url=eq.{urllib.parse.quote(source['url'],safe='')}&select=id&limit=1") or []
+            encoded=urllib.parse.quote(source['url'],safe='')
+            existing=req('GET',f"/rest/v1/research_sources?project_id=eq.{p['id']}&url=eq.{encoded}&select=id&limit=1") or []
             if not existing:req('POST','/rest/v1/research_sources',{'user_id':p['user_id'],'project_id':p['id'],'title':source.get('title') or 'Public source','url':source['url'],'claim':'Automatic repair source used to rewrite final narration.','verified':True},'return=minimal')
     else:
         sources=verified_sources(p['id']);made=write_longform(p,sources);candidate=dict(p,script=made['script'],hook=made['hook'])
     return candidate,creative_preflight(candidate)
-
 def requeue(p,candidate,result,attempts,reason,label):
     now=datetime.now(timezone.utc).isoformat();patch('video_projects',p['id'],{'title':candidate.get('title') or p.get('title'),'script':candidate.get('script') or p.get('script'),'hook':candidate.get('hook') or p.get('hook'),'creative_score':result['score'],'status':'generating','output_url':None,'scheduled_publish_at':None,'failure_reason':f'{label} passed at {result["score"]}/100; queued for clean rerender.','qc_attempts':attempts+1,'updated_at':now});req('POST','/rest/v1/render_jobs',{'user_id':p['user_id'],'project_id':p['id'],'engine':'motion-first-v13-auto-repair','status':'queued'},'return=minimal');report(p,True,result['score'],[label,'requeued'],{'previous_failure':reason,'attempt':attempts+1,'preflight':result})
 
@@ -88,13 +88,10 @@ for p in rows:
     if leaks or any(x in reason for x in creative_faults):
         try:
             candidate,result=writer_rewrite(p) if leaks or 'automatic narration writer failed' in reason else repair_creative(p)
-            if not result['passed'] and not leaks:
-                candidate,result=writer_rewrite(p)
-            if result['passed']:
-                requeue(p,candidate,result,attempts,reason,'Automatic narration repair');rewritten+=1;requeued+=1;continue
+            if not result['passed'] and not leaks:candidate,result=writer_rewrite(p)
+            if result['passed']:requeue(p,candidate,result,attempts,reason,'Automatic narration repair');rewritten+=1;requeued+=1;continue
             report(p,False,result['score'],['automatic rewrite did not meet publish-grade threshold'],{'previous_failure':reason,'preflight':result});waiting+=1;continue
-        except Exception as exc:
-            report(p,False,20,['automatic rewrite could not safely complete'],{'previous_failure':reason,'error':str(exc)[:500]});waiting+=1;continue
+        except Exception as exc:report(p,False,20,['automatic rewrite could not safely complete'],{'previous_failure':reason,'error':str(exc)[:500]});waiting+=1;continue
     if any(x in reason for x in nonmechanical):report(p,False,20,['factual/evidence problem requires verified-source rewrite'],{'previous_failure':reason,'attempts':attempts});waiting+=1;continue
     if not any(x in reason for x in repairable):report(p,False,30,['failure is not safely auto-repairable'],{'previous_failure':reason,'attempts':attempts});waiting+=1;continue
     now=datetime.now(timezone.utc).isoformat();patch('video_projects',p['id'],{'status':'generating','output_url':None,'scheduled_publish_at':None,'failure_reason':f'Automatic repair attempt {attempts+1}: rebuilding failed media/edit components.','qc_attempts':attempts+1,'updated_at':now});req('POST','/rest/v1/render_jobs',{'user_id':p['user_id'],'project_id':p['id'],'engine':'motion-first-v13-auto-repair','status':'queued'},'return=minimal');report(p,True,60,['repairable failure requeued'],{'previous_failure':reason,'attempt':attempts+1});requeued+=1
