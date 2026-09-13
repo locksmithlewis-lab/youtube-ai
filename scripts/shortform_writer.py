@@ -11,10 +11,22 @@ GENERIC_MARKERS=(
     'start with the obvious version',
     'here is the key fact about',
 )
+HOOK_SIGNAL=re.compile(r'(?i)(\?|\bwhy\b|\bhow\b|\bbut\b|\bproblem\b|\bcost\b|\bpaid\b|\bsuddenly\b|\bhidden\b|\bchanged\b|\bnever\b|\buntil\b|\bdoor\b|\bvoice\b|\bfound\b)')
 
 
 def _words(text):
     return re.findall(r"[A-Za-z0-9']+",str(text or ''))
+
+
+def _clean_spoken(text):
+    text=str(text or '')
+    text=re.sub(r'\[[^\]]+\]','',text)
+    text=re.sub(r'\([^)]{24,}\)','',text)
+    text=text.replace('—',', ').replace('–','-')
+    text=re.sub(r'\s+',' ',text).strip()
+    text=re.sub(r'\s+([,.;:!?])',r'\1',text)
+    text=re.sub(r'([,.;:!?])(?=[A-Za-z0-9])',r'\1 ',text)
+    return text
 
 
 def _is_fictional(project):
@@ -31,6 +43,26 @@ def _target_min_words(project):
     return max(55,int(target*1.7))
 
 
+def _spoken_sentences(text):
+    clean=_clean_spoken(text)
+    return [s.strip() for s in re.split(r'(?<=[.!?])\s+',clean) if len(_words(s))>=3]
+
+
+def _readability_ok(script):
+    parts=_spoken_sentences(script)
+    if len(parts)<6:
+        return False
+    lengths=[len(_words(s)) for s in parts]
+    if any(n>24 for n in lengths):
+        return False
+    if sum(1 for n in lengths if n<4)>1:
+        return False
+    normalized=[re.sub(r'\W+',' ',s.lower()).strip() for s in parts]
+    if len(set(normalized))!=len(normalized):
+        return False
+    return True
+
+
 def needs_script(project):
     fmt=str(project.get('format') or '').lower()
     target=int(project.get('target_duration_seconds') or 60)
@@ -39,8 +71,13 @@ def needs_script(project):
     script=str(project.get('script') or '').strip()
     hook=str(project.get('hook') or '').strip()
     low=script.lower()
-    weak_hook=(len(_words(hook))<5 or len(_words(hook))>18 or not re.search(r'(?i)(\?|\bwhy\b|\bhow\b|\bbut\b|\bproblem\b|\bcost\b|\bpaid\b|\bsuddenly\b|\bhidden\b|\bchanged\b|\bnever\b|\buntil\b|\bdoor\b|\bvoice\b|\bfound\b)',hook))
-    return len(_words(script))<_target_min_words(project) or any(marker in low for marker in GENERIC_MARKERS) or weak_hook
+    weak_hook=(len(_words(hook))<5 or len(_words(hook))>18 or not HOOK_SIGNAL.search(hook))
+    return (
+        len(_words(script))<_target_min_words(project)
+        or any(marker in low for marker in GENERIC_MARKERS)
+        or weak_hook
+        or not _readability_ok(script)
+    )
 
 
 def _source(topic):
@@ -56,43 +93,58 @@ def _source(topic):
     if not pages:
         raise RuntimeError('No reliable public reference found for this Short topic.')
     page=pages[0]
-    extract=re.sub(r'\s+',' ',str(page.get('extract') or '')).strip()
+    extract=_clean_spoken(page.get('extract') or '')
     if len(_words(extract))<45:
         raise RuntimeError('Public reference is too thin to support a publishable factual Short.')
     return {'title':str(page.get('title') or topic),'url':str(page.get('fullurl') or ''),'extract':extract}
 
 
 def _sentences(text):
-    return [re.sub(r'\s+',' ',s).strip() for s in re.split(r'(?<=[.!?])\s+',text) if len(_words(s))>=6]
+    return [s for s in _spoken_sentences(text) if len(_words(s))>=6]
+
+
+def _trim_sentence(sentence,max_words):
+    s=_clean_spoken(sentence)
+    ws=s.split()
+    if len(ws)>max_words:
+        cut=ws[:max_words]
+        while cut and cut[-1].lower().rstrip(',;:') in ('and','or','but','because','while','which','that','with','of','to'):
+            cut=cut[:-1]
+        s=' '.join(cut).rstrip(',;:')
+    if not s.endswith(('.', '!', '?')):
+        s+='.'
+    return s
 
 
 def _compact_claim(sentence,index):
-    s=re.sub(r'\[[^\]]+\]','',sentence).strip()
-    s=re.sub(r'\([^)]{20,}\)','',s).strip()
-    max_words=18 if index<2 else 21
-    ws=s.split()
-    if len(ws)>max_words:
-        s=' '.join(ws[:max_words]).rstrip(',;:')+'.'
-    if not s.endswith(('.', '!', '?')):
-        s+='.'
+    s=_trim_sentence(sentence,17 if index<2 else 20)
     if index==0:
         return s
-    prefixes=('But ','Then ','That matters because ','The bigger consequence is ')
+    transitions=(
+        'That matters because ',
+        'The next detail is ',
+        'More importantly, ',
+        'The result is ',
+        'And that means ',
+    )
     lower=s[0].lower()+s[1:] if len(s)>1 else s.lower()
-    return prefixes[(index-1)%len(prefixes)]+lower
+    prefix=transitions[(index-1)%len(transitions)]
+    combined=prefix+lower
+    return _trim_sentence(combined,22)
 
 
 def _make_hook(project,topic):
-    current=re.sub(r'\s+',' ',str(project.get('hook') or '')).strip()
-    if 5<=len(_words(current))<=18 and re.search(r'(?i)(\?|\bwhy\b|\bhow\b|\bbut\b|\bproblem\b|\bcost\b|\bpaid\b|\bsuddenly\b|\bhidden\b|\bchanged\b|\bnever\b|\buntil\b|\bdoor\b|\bvoice\b|\bfound\b)',current):
-        return current
-    return f'Why does {topic} matter more than the headline makes it seem?'
+    current=_clean_spoken(project.get('hook') or '')
+    if 5<=len(_words(current))<=18 and HOOK_SIGNAL.search(current):
+        return _trim_sentence(current,18)
+    topic_words=' '.join(_words(topic)[:8])
+    return f'Why is {topic_words} more surprising than it sounds?'
 
 
 def _fiction_hook(project,topic):
-    current=re.sub(r'\s+',' ',str(project.get('hook') or '')).strip()
+    current=_clean_spoken(project.get('hook') or '')
     if 5<=len(_words(current))<=18 and re.search(r'(?i)(\?|\bbut\b|\bnever\b|\buntil\b|\bfound\b|\bhidden\b|\bchanged\b)',current):
-        return current
+        return _trim_sentence(current,18)
     title=str(project.get('title') or topic).strip()
     subtitle=title.split(':')[-1].strip(' —-') if ':' in title else title.split('—')[-1].strip()
     key=' '.join(_words(subtitle)[:7]) or 'the next clue'
@@ -101,21 +153,21 @@ def _fiction_hook(project,topic):
 
 def _fiction_seed(project,topic):
     for key in ('description','concept','prompt','summary','premise'):
-        value=re.sub(r'\s+',' ',str(project.get(key) or '')).strip()
+        value=_clean_spoken(project.get(key) or '')
         if len(_words(value))>=6:
             return value
     return topic
 
 
 def _story_parts(seed):
-    clean=re.sub(r'\s+',' ',seed).strip()
+    clean=_clean_spoken(seed)
     protagonist=(_words(clean) or ['Someone'])[0]
     location='the next place'
-    match=re.search(r'(?i)\binto the ([^,]+)',clean)
+    match=re.search(r'(?i)\binto the ([^,.;!?]+)',clean)
     if match:
         location='the '+match.group(1).strip()
     consequence='the mystery'
-    match=re.search(r'(?i)\badvances? ([^,]+)',clean)
+    match=re.search(r'(?i)\badvances? ([^,.;!?]+)',clean)
     if match:
         consequence=match.group(1).strip()
     return protagonist,location,consequence
@@ -127,32 +179,35 @@ def _write_fiction(project,topic):
     protagonist,location,consequence=_story_parts(seed)
     beats=[
         f'{protagonist} entered {location} expecting one answer, but found a contradiction instead.',
-        'A familiar detail appeared in the wrong place, making the earlier warning impossible to dismiss.',
-        f'Suddenly, {consequence} pointed toward someone inside the group.',
-        'Nobody agreed on what the clue meant, and trust cracked before anyone could test it.',
-        f'{protagonist} had one choice: retreat safely, or follow the clue before it disappeared.',
+        'A familiar detail appeared in the wrong place, so the earlier warning suddenly felt real.',
+        f'Then {consequence} pointed toward someone inside the group.',
+        'No one agreed on what the clue meant, and their trust started to crack.',
+        f'{protagonist} had to choose between retreating safely and following the clue before it disappeared.',
         'They followed it, and the place behind them locked shut.',
     ]
-    closing='That decision changed what the group thought the mystery was really about.'
+    closing='That choice changed what the group believed the mystery was really about.'
     target_min=_target_min_words(project)
     padding=[
-        f'One overlooked detail in {location} made the danger feel deliberate rather than accidental.',
-        f'Worse, the clue tied {consequence} to a consequence nobody in the group had prepared for.',
-        f'By then, {protagonist} could no longer treat the discovery as a coincidence.',
+        f'One overlooked detail in {location} made the danger feel deliberate instead of accidental.',
+        f'Worse, the clue tied {consequence} to a consequence nobody had prepared for.',
+        f'By then, {protagonist} could no longer dismiss the discovery as coincidence.',
     ]
-    script=' '.join([hook]+beats+[closing])
+    clean_beats=[_trim_sentence(x,22) for x in beats]
+    script=' '.join([hook]+clean_beats+[closing])
     for beat in padding:
         if len(_words(script))>=target_min:
             break
-        beats.append(beat)
-        script=' '.join([hook]+beats+[closing])
+        clean_beats.append(_trim_sentence(beat,22))
+        script=' '.join([hook]+clean_beats+[closing])
+    if not _readability_ok(script):
+        raise RuntimeError('Generated fiction narration failed coherence/readability checks.')
     title=str(project.get('title') or topic).strip()[:78]
     return {
         'script':script,
         'hook':hook,
         'title':title,
         'word_count':len(_words(script)),
-        'model':'original-fiction-retention-writer-v3',
+        'model':'original-fiction-retention-writer-v4-coherent',
         'source':None,
         'fictional':True,
     }
@@ -167,29 +222,32 @@ def write(project):
     source=_source(topic)
     source_sentences=_sentences(source['extract'])
     hook=_make_hook(project,topic)
-    closing=f'That is the part of {topic} the headline alone does not explain.'
+    closing=f'That is why {" ".join(_words(topic)[:7])} matters more than the headline suggests.'
     desired=_target_min_words(project)
     closing_words=len(_words(closing))
     claims=[]
     total=len(_words(hook))
     soft_cap=max(118,desired+28)
-    for sentence in source_sentences[:12]:
+    for sentence in source_sentences[:14]:
         claim=_compact_claim(sentence,len(claims))
         n=len(_words(claim))
         if claims and total+n+closing_words>soft_cap:
             break
-        claims.append(claim);total+=n
+        claims.append(claim)
+        total+=n
         if total+closing_words>=desired and len(claims)>=4:
             break
     if len(claims)<4 or total+closing_words<desired:
         raise RuntimeError(f'Source could not support the {desired}-word publish-grade narration floor for this Short.')
-    script=' '.join([hook]+claims+[closing])
+    script=' '.join([hook]+claims+[_trim_sentence(closing,20)])
+    if not _readability_ok(script):
+        raise RuntimeError('Generated factual narration failed coherence/readability checks.')
     return {
         'script':script,
         'hook':hook,
         'title':str(project.get('title') or f'{topic}: The Detail Most People Miss').strip()[:78],
         'word_count':len(_words(script)),
-        'model':'source-backed-retention-writer-v3',
+        'model':'source-backed-retention-writer-v4-coherent',
         'source':source,
         'fictional':False,
     }
