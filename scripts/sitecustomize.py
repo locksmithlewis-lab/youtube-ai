@@ -111,3 +111,8 @@ try:
   return result
  _pg.final_video_qc=_aligned_final_video_qc
 except Exception as e:print('Short final-QC alignment unavailable:',str(e)[:240])
+
+try:
+ from engagement_overlay import install as _install_engagement_overlay
+ _install_engagement_overlay()
+except Exception as e:print('Engagement CTA unavailable:',str(e)[:240])
