@@ -9,6 +9,7 @@ GENERIC_MARKERS=(
     'now flip the perspective',
     'the takeaway is simple',
     'start with the obvious version',
+    'here is the key fact about',
 )
 
 
@@ -22,8 +23,10 @@ def needs_script(project):
     if fmt not in ('short','shorts','story') or target>120:
         return False
     script=str(project.get('script') or '').strip()
+    hook=str(project.get('hook') or '').strip()
     low=script.lower()
-    return len(_words(script))<55 or any(marker in low for marker in GENERIC_MARKERS)
+    weak_hook=(len(_words(hook))<5 or len(_words(hook))>18 or not re.search(r'(?i)(\?|\bwhy\b|\bhow\b|\bbut\b|\bproblem\b|\bcost\b|\bpaid\b|\bsuddenly\b|\bhidden\b|\bchanged\b)',hook))
+    return len(_words(script))<55 or any(marker in low for marker in GENERIC_MARKERS) or weak_hook
 
 
 def _source(topic):
@@ -42,35 +45,34 @@ def _source(topic):
     extract=re.sub(r'\s+',' ',str(page.get('extract') or '')).strip()
     if len(_words(extract))<45:
         raise RuntimeError('Public reference is too thin to support a publishable factual Short.')
-    return {
-        'title':str(page.get('title') or topic),
-        'url':str(page.get('fullurl') or ''),
-        'extract':extract,
-    }
+    return {'title':str(page.get('title') or topic),'url':str(page.get('fullurl') or ''),'extract':extract}
 
 
 def _sentences(text):
     return [re.sub(r'\s+',' ',s).strip() for s in re.split(r'(?<=[.!?])\s+',text) if len(_words(s))>=6]
 
 
-def _compact_claim(sentence,topic,index):
+def _compact_claim(sentence,index):
     s=re.sub(r'\[[^\]]+\]','',sentence).strip()
     s=re.sub(r'\([^)]{20,}\)','',s).strip()
-    words=s.split()
-    if len(words)>20:
-        s=' '.join(words[:20]).rstrip(',;:')+'.'
+    max_words=18 if index<2 else 21
+    ws=s.split()
+    if len(ws)>max_words:
+        s=' '.join(ws[:max_words]).rstrip(',;:')+'.'
     if not s.endswith(('.', '!', '?')):
         s+='.'
-    # Change the sentence frame so the output is narration, not a pasted source paragraph.
     if index==0:
-        return f'Here is the key fact about {topic}: {s[0].lower()+s[1:] if len(s)>1 else s.lower()}'
-    frames=(
-        'Another useful piece of the story is this: ',
-        'The next detail adds context: ',
-        'That leads to another sourced fact: ',
-        'One more part is worth knowing: ',
-    )
-    return frames[(index-1)%len(frames)]+s[0].lower()+s[1:]
+        return s
+    prefixes=('But ','Then ','That matters because ','The bigger consequence is ')
+    lower=s[0].lower()+s[1:] if len(s)>1 else s.lower()
+    return prefixes[(index-1)%len(prefixes)]+lower
+
+
+def _make_hook(project,topic):
+    current=re.sub(r'\s+',' ',str(project.get('hook') or '')).strip()
+    if 5<=len(_words(current))<=18 and re.search(r'(?i)(\?|\bwhy\b|\bhow\b|\bbut\b|\bproblem\b|\bcost\b|\bpaid\b|\bsuddenly\b|\bhidden\b|\bchanged\b)',current):
+        return current
+    return f'Why does {topic} matter more than the headline makes it seem?'
 
 
 def write(project):
@@ -79,28 +81,28 @@ def write(project):
         raise RuntimeError('Short topic is too vague to source and write automatically.')
     source=_source(topic)
     source_sentences=_sentences(source['extract'])
+    hook=_make_hook(project,topic)
     claims=[]
-    total=0
-    for sentence in source_sentences[:8]:
-        claim=_compact_claim(sentence,topic,len(claims))
+    total=len(_words(hook))
+    for sentence in source_sentences[:10]:
+        claim=_compact_claim(sentence,len(claims))
         n=len(_words(claim))
-        if claims and total+n>125:
+        if claims and total+n>118:
             break
         claims.append(claim);total+=n
-        if total>=92 and len(claims)>=4:
+        if total>=82 and len(claims)>=4:
             break
-    if len(claims)<4 or total<70:
+    if len(claims)<4 or total<65:
         raise RuntimeError('Source could not support enough distinct narration beats for a publishable Short.')
-    hook=claims[0]
-    closing=f'Those details are why {topic} is worth understanding beyond the headline.'
-    script=' '.join(claims+[closing])
-    if len(_words(script))>140:
-        script=' '.join(_words(script)[:138])+'.'
+    closing=f'That is the part of {topic} the headline alone does not explain.'
+    script=' '.join([hook]+claims+[closing])
+    if len(_words(script))>132:
+        script=' '.join(_words(script)[:130])+'.'
     return {
         'script':script,
         'hook':hook,
-        'title':str(project.get('title') or f'{topic}: What Matters').strip()[:100],
+        'title':str(project.get('title') or f'{topic}: The Detail Most People Miss').strip()[:78],
         'word_count':len(_words(script)),
-        'model':'source-backed-keyless-writer-v1',
+        'model':'source-backed-retention-writer-v2',
         'source':source,
     }
