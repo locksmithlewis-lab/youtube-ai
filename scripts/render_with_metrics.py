@@ -49,23 +49,28 @@ def report(project, job, stage, result):
 def prepare_shortform(project):
     if not short_needs_script(project):
         return project
-    step(project, 'script_writer', 'running', 'Researching the topic and writing final spoken Short narration from a public source.')
+    step(project, 'script_writer', 'running', 'Writing final spoken Short narration; factual projects require public support, explicitly fictional/story projects do not.')
     try:
         made = write_shortform(project)
-        source = made['source']
-        existing = req('GET', f"/rest/v1/research_sources?project_id=eq.{project['id']}&select=id,url") or []
-        if source.get('url') and not any(row.get('url') == source['url'] for row in existing):
-            req('POST', '/rest/v1/research_sources', {
-                'user_id': project['user_id'], 'project_id': project['id'],
-                'title': source['title'], 'url': source['url'],
-                'claim': 'Automatically retrieved public reference used to construct source-backed narration.',
-                'verified': True,
-            }, 'return=minimal')
+        source = made.get('source')
+        if source:
+            existing = req('GET', f"/rest/v1/research_sources?project_id=eq.{project['id']}&select=id,url") or []
+            if source.get('url') and not any(row.get('url') == source['url'] for row in existing):
+                req('POST', '/rest/v1/research_sources', {
+                    'user_id': project['user_id'], 'project_id': project['id'],
+                    'title': source['title'], 'url': source['url'],
+                    'claim': 'Automatically retrieved public reference used to construct source-backed narration.',
+                    'verified': True,
+                }, 'return=minimal')
         patch('video_projects', project['id'], {
             'script': made['script'], 'hook': made['hook'], 'title': made['title'], 'updated_at': 'now()',
         })
         project = dict(project, script=made['script'], hook=made['hook'], title=made['title'])
-        step(project, 'script_writer', 'passed', f"Generated {made['word_count']} words of sourced spoken narration with {made['model']} from {source['title']}.")
+        if made.get('fictional'):
+            detail = f"Generated {made['word_count']} words of original fictional narration with {made['model']}; no factual sourcing required."
+        else:
+            detail = f"Generated {made['word_count']} words of sourced spoken narration with {made['model']} from {source['title']}."
+        step(project, 'script_writer', 'passed', detail)
         return project
     except Exception as exc:
         step(project, 'script_writer', 'failed', str(exc))
