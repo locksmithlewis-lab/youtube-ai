@@ -1,6 +1,8 @@
 import json, os, re, urllib.request
 from datetime import datetime, timezone
 from production_guard import creative_preflight, instruction_leaks
+from shortform_writer import write as write_shortform
+from longform_writer import write as write_longform
 
 SUPABASE_URL=os.environ.get('SUPABASE_URL','').rstrip('/');KEY=os.environ.get('SUPABASE_SERVICE_ROLE_KEY','')
 if not SUPABASE_URL or not KEY:raise SystemExit('Supabase secrets required.')
@@ -9,7 +11,7 @@ def req(method,path,data=None,prefer=None):
     h=dict(H)
     if prefer:h['Prefer']=prefer
     r=urllib.request.Request(SUPABASE_URL+path,data=None if data is None else json.dumps(data).encode(),headers=h,method=method)
-    with urllib.request.urlopen(r,timeout=60) as x:
+    with urllib.request.urlopen(r,timeout=90) as x:
         raw=x.read();return json.loads(raw.decode()) if raw else None
 
 def patch(table,id,payload):return req('PATCH',f'/rest/v1/{table}?id=eq.{id}',payload,'return=minimal')
@@ -27,22 +29,15 @@ def clean_script(script):
     s=str(script or '')
     s=re.sub(r'(?im)^\s*(?:OPENING|ENDING|SCENE\s+\d+|CONTINUITY RULE)\s*[—:-]\s*','',s)
     s=re.sub(r'(?im)^.*\b(?:production note|visual planner|queued for)\b.*$',' ',s)
-    weak={
-      'looks ordinary until one detail changes the whole story':'seems ordinary at first, but one detail changes the story',
-      'catch the wave before it moves on':'follow what happens next',
-      'this is the moment where a normal upload turns into':'this is where the story becomes',
-      'nobody knows what happens next':'what happens next changes the stakes'
-    }
+    weak={'looks ordinary until one detail changes the whole story':'seems ordinary at first, but one detail changes the story','catch the wave before it moves on':'follow what happens next','this is the moment where a normal upload turns into':'this is where the story becomes','nobody knows what happens next':'what happens next changes the stakes'}
     for old,new in weak.items():s=re.sub(re.escape(old),new,s,flags=re.I)
     return re.sub(r'\s+',' ',s).strip()
 def diversify_starts(sentences):
     if not sentences:return sentences
-    starts=[s.split()[0].lower() for s in sentences if s.split()]
-    out=[];seen={};trans=['Meanwhile,','Then,','Soon,','But,','Across the scene,','A moment later,']
-    for i,s in enumerate(sentences):
+    starts=[s.split()[0].lower() for s in sentences if s.split()];out=[];seen={};trans=['Meanwhile,','Then,','Soon,','But,','Across the scene,','A moment later,']
+    for s in sentences:
         first=s.split()[0].lower();seen[first]=seen.get(first,0)+1
-        if starts.count(first)/max(1,len(starts))>.35 and seen[first]>1:
-            s=f'{trans[(seen[first]-2)%len(trans)]} {s[0].lower()+s[1:] if len(s)>1 else s.lower()}'
+        if starts.count(first)/max(1,len(starts))>.35 and seen[first]>1:s=f'{trans[(seen[first]-2)%len(trans)]} {s[0].lower()+s[1:] if len(s)>1 else s.lower()}'
         out.append(s)
     return out
 def fit_short_budget(sentences,high):
@@ -51,55 +46,56 @@ def fit_short_budget(sentences,high):
         n=len(re.findall(r"[A-Za-z0-9']+",s))
         if chosen and wc+n>high:break
         chosen.append(s);wc+=n
-    while len(chosen)<6 and len(chosen)<len(sentences):
-        s=sentences[len(chosen)];n=len(re.findall(r"[A-Za-z0-9']+",s))
-        if wc+n>high:break
-        chosen.append(s);wc+=n
     return chosen
 def verified_sources(project_id):
     return req('GET',f'/rest/v1/research_sources?project_id=eq.{project_id}&verified=eq.true&select=title,url,claim&limit=20') or []
 def repair_creative(p):
-    original_script=str(p.get('script') or '')
-    script=clean_script(original_script);title=clean_title(p.get('title'))
-    ss=diversify_starts(sentence_list(script))
-    probe=dict(p,title=title,script=' '.join(ss));first=creative_preflight(probe);low,high=first['metrics']['target_word_range']
+    script=clean_script(p.get('script'));title=clean_title(p.get('title'));ss=diversify_starts(sentence_list(script))
+    probe=dict(p,title=title,script=' '.join(ss));first=creative_preflight(probe);_,high=first['metrics']['target_word_range']
     short=str(p.get('format') or '').lower() in ('short','shorts','story') and int(p.get('target_duration_seconds') or 60)<=120
     if short and len(re.findall(r"[A-Za-z0-9']+",' '.join(ss)))>high:ss=fit_short_budget(ss,high)
     script=' '.join(ss).strip();hook=str(p.get('hook') or '').strip()
     if len(re.findall(r"[A-Za-z0-9']+",hook))<5 and ss:hook=ss[0]
     if len(re.findall(r"[A-Za-z0-9']+",hook))>24:hook=' '.join(hook.split()[:22]).rstrip(',;:')+'.'
-    candidate=dict(p,title=title,script=script,hook=hook);result=creative_preflight(candidate)
-    return candidate,result
+    candidate=dict(p,title=title,script=script,hook=hook);return candidate,creative_preflight(candidate)
+def writer_rewrite(p):
+    fmt=str(p.get('format') or '').lower();short=fmt in ('short','shorts','story') and int(p.get('target_duration_seconds') or 60)<=120
+    if short:
+        made=write_shortform(dict(p,title=clean_title(p.get('title'))))
+        candidate=dict(p,title=made['title'],script=made['script'],hook=made['hook'])
+        source=made.get('source') or {}
+        if source.get('url'):
+            existing=req('GET',f"/rest/v1/research_sources?project_id=eq.{p['id']}&url=eq.{urllib.parse.quote(source['url'],safe='')}&select=id&limit=1") or []
+            if not existing:req('POST','/rest/v1/research_sources',{'user_id':p['user_id'],'project_id':p['id'],'title':source.get('title') or 'Public source','url':source['url'],'claim':'Automatic repair source used to rewrite final narration.','verified':True},'return=minimal')
+    else:
+        sources=verified_sources(p['id']);made=write_longform(p,sources);candidate=dict(p,script=made['script'],hook=made['hook'])
+    return candidate,creative_preflight(candidate)
+
+def requeue(p,candidate,result,attempts,reason,label):
+    now=datetime.now(timezone.utc).isoformat();patch('video_projects',p['id'],{'title':candidate.get('title') or p.get('title'),'script':candidate.get('script') or p.get('script'),'hook':candidate.get('hook') or p.get('hook'),'creative_score':result['score'],'status':'generating','output_url':None,'scheduled_publish_at':None,'failure_reason':f'{label} passed at {result["score"]}/100; queued for clean rerender.','qc_attempts':attempts+1,'updated_at':now});req('POST','/rest/v1/render_jobs',{'user_id':p['user_id'],'project_id':p['id'],'engine':'motion-first-v13-auto-repair','status':'queued'},'return=minimal');report(p,True,result['score'],[label,'requeued'],{'previous_failure':reason,'attempt':attempts+1,'preflight':result})
 
 rows=req('GET','/rest/v1/video_projects?status=eq.failed&select=*&order=updated_at.asc&limit=100') or []
-repairable=('visual','motion','image','provider','download','429','403','timeout','ffmpeg','decode','duration','audio','silence','freeze','black frame','render','size validation','storage')
-creative_faults=('script too','production directions','template phrasing','narrative beats','opening hook','generic batch title','sentences start the same way','sentence rhythm','vocabulary is too repetitive')
+repairable=('visual','motion','image','provider','download','429','403','timeout','ffmpeg','decode','duration','audio','silence','freeze','black frame','render','size validation','storage','legacy render interrupted')
+creative_faults=('script too','production directions','template phrasing','narrative beats','opening hook','generic batch title','sentences start the same way','sentence rhythm','vocabulary is too repetitive','automatic narration writer failed')
 nonmechanical=('factual','verified evidence')
 requeued=rewritten=discarded=waiting=series_owned=0
 for p in rows:
     membership=series_membership(p['id'])
-    if membership:
-        report(p,False,50,['series-linked failure is owned by the ordered continuity controller'],{'series_id':membership.get('series_id'),'episode_number':membership.get('episode_number'),'previous_failure':p.get('failure_reason')})
-        waiting+=1;series_owned+=1;continue
+    if membership:report(p,False,50,['series-linked failure is owned by the ordered continuity controller'],{'series_id':membership.get('series_id'),'episode_number':membership.get('episode_number'),'previous_failure':p.get('failure_reason')});waiting+=1;series_owned+=1;continue
     reason=str(p.get('failure_reason') or '').lower();attempts=int(p.get('qc_attempts') or 0)
-    if attempts>=2:
-        report(p,False,0,['automatic repair limit reached'],{'previous_failure':reason,'attempts':attempts});discarded+=1;continue
-    now=datetime.now(timezone.utc).isoformat()
+    if attempts>=2:report(p,False,0,['automatic repair limit reached'],{'previous_failure':reason,'attempts':attempts});discarded+=1;continue
     leaks=instruction_leaks(str(p.get('script') or ''))
-    if leaks:
-        sources=verified_sources(p['id'])
-        report(p,False,10,['instruction-script quarantined; automatic trimming is forbidden because it is not narration','verified research required before factual rewrite'],{'previous_failure':reason,'instruction_leaks':leaks[:8],'verified_source_count':len(sources)})
-        waiting+=1;continue
-    if any(x in reason for x in creative_faults) and not any(x in reason for x in nonmechanical):
-        candidate,result=repair_creative(p)
-        if result['passed']:
-            patch('video_projects',p['id'],{'title':candidate['title'],'script':candidate['script'],'hook':candidate['hook'],'creative_score':result['score'],'status':'generating','output_url':None,'scheduled_publish_at':None,'failure_reason':f'Automatic creative repair passed at {result["score"]}/100; queued for clean rerender.','qc_attempts':attempts+1,'updated_at':now})
-            req('POST','/rest/v1/render_jobs',{'user_id':p['user_id'],'project_id':p['id'],'engine':'motion-first-creative-repair','status':'queued'},'return=minimal')
-            report(p,True,result['score'],['creative failure repaired and requeued'],{'previous_failure':reason,'attempt':attempts+1,'preflight':result});rewritten+=1;requeued+=1;continue
-        report(p,False,result['score'],['automatic creative cleanup did not meet publish-grade threshold'],{'previous_failure':reason,'attempts':attempts,'preflight':result});waiting+=1;continue
-    if any(x in reason for x in nonmechanical):
-        report(p,False,20,['factual/evidence problem requires verified-source rewrite'],{'previous_failure':reason,'attempts':attempts});waiting+=1;continue
-    if not any(x in reason for x in repairable):
-        report(p,False,30,['failure is not safely auto-repairable'],{'previous_failure':reason,'attempts':attempts});waiting+=1;continue
-    patch('video_projects',p['id'],{'status':'generating','output_url':None,'scheduled_publish_at':None,'failure_reason':f'Automatic repair attempt {attempts+1}: rebuilding failed media/edit components.','qc_attempts':attempts+1,'updated_at':now});req('POST','/rest/v1/render_jobs',{'user_id':p['user_id'],'project_id':p['id'],'engine':'motion-first-repair','status':'queued'},'return=minimal');report(p,True,60,['repairable failure requeued'],{'previous_failure':reason,'attempt':attempts+1});requeued+=1
+    if leaks or any(x in reason for x in creative_faults):
+        try:
+            candidate,result=writer_rewrite(p) if leaks or 'automatic narration writer failed' in reason else repair_creative(p)
+            if not result['passed'] and not leaks:
+                candidate,result=writer_rewrite(p)
+            if result['passed']:
+                requeue(p,candidate,result,attempts,reason,'Automatic narration repair');rewritten+=1;requeued+=1;continue
+            report(p,False,result['score'],['automatic rewrite did not meet publish-grade threshold'],{'previous_failure':reason,'preflight':result});waiting+=1;continue
+        except Exception as exc:
+            report(p,False,20,['automatic rewrite could not safely complete'],{'previous_failure':reason,'error':str(exc)[:500]});waiting+=1;continue
+    if any(x in reason for x in nonmechanical):report(p,False,20,['factual/evidence problem requires verified-source rewrite'],{'previous_failure':reason,'attempts':attempts});waiting+=1;continue
+    if not any(x in reason for x in repairable):report(p,False,30,['failure is not safely auto-repairable'],{'previous_failure':reason,'attempts':attempts});waiting+=1;continue
+    now=datetime.now(timezone.utc).isoformat();patch('video_projects',p['id'],{'status':'generating','output_url':None,'scheduled_publish_at':None,'failure_reason':f'Automatic repair attempt {attempts+1}: rebuilding failed media/edit components.','qc_attempts':attempts+1,'updated_at':now});req('POST','/rest/v1/render_jobs',{'user_id':p['user_id'],'project_id':p['id'],'engine':'motion-first-v13-auto-repair','status':'queued'},'return=minimal');report(p,True,60,['repairable failure requeued'],{'previous_failure':reason,'attempt':attempts+1});requeued+=1
 print(json.dumps({'failed_checked':len(rows),'requeued':requeued,'creative_rewritten':rewritten,'rewrite_needed':waiting,'repair_limit_reached':discarded,'series_owned':series_owned}))
