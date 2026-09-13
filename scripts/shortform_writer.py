@@ -18,12 +18,6 @@ def _words(text):
 
 
 def _is_fictional(project):
-    """Return True only when the project is explicitly story/fiction oriented.
-
-    Fiction should never be forced through factual-source validation.  We keep
-    this deliberately conservative so explainers/news/gaming facts still need
-    public support.
-    """
     fmt=str(project.get('format') or '').strip().lower()
     if fmt in ('story','fiction','fictional','narrative'):
         return True
@@ -92,10 +86,12 @@ def _make_hook(project,topic):
 
 def _fiction_hook(project,topic):
     current=re.sub(r'\s+',' ',str(project.get('hook') or '')).strip()
-    if 5<=len(_words(current))<=18:
+    if 5<=len(_words(current))<=18 and re.search(r'(?i)(\?|\bbut\b|\bnever\b|\buntil\b|\bfound\b|\bhidden\b|\bchanged\b)',current):
         return current
-    clean=re.sub(r'\s+',' ',topic).strip().rstrip('.!?')
-    return f'Everything felt normal until {clean} stopped making sense.'
+    title=str(project.get('title') or topic).strip()
+    subtitle=title.split(':')[-1].strip(' —-') if ':' in title else title.split('—')[-1].strip()
+    key=' '.join(_words(subtitle)[:7]) or 'the next clue'
+    return f'But {key} was only the beginning.'
 
 
 def _fiction_seed(project,topic):
@@ -106,30 +102,41 @@ def _fiction_seed(project,topic):
     return topic
 
 
+def _story_parts(seed):
+    clean=re.sub(r'\s+',' ',seed).strip()
+    protagonist=(_words(clean) or ['Someone'])[0]
+    location='the next place'
+    match=re.search(r'(?i)\binto the ([^,]+)',clean)
+    if match:
+        location='the '+match.group(1).strip()
+    consequence='the mystery'
+    match=re.search(r'(?i)\badvances? ([^,]+)',clean)
+    if match:
+        consequence=match.group(1).strip()
+    return protagonist,location,consequence
+
+
 def _write_fiction(project,topic):
-    """Create original spoken narration without pretending fiction has sources."""
     hook=_fiction_hook(project,topic)
     seed=_fiction_seed(project,topic)
-    seed_words=_words(seed)
-    focus=' '.join(seed_words[:18]) if seed_words else topic
+    protagonist,location,consequence=_story_parts(seed)
     beats=[
-        f'At first, {focus} seemed like the kind of detail anyone could ignore.',
-        'Then one small inconsistency appeared, and every easy explanation started falling apart.',
-        'The closer the character looked, the more the ordinary details began pointing in the same impossible direction.',
-        'A choice that should have been harmless suddenly carried a consequence nobody had warned them about.',
-        'By the time the truth became visible, turning back would have meant losing the only chance to understand it.',
+        f'{protagonist} entered {location} expecting one answer, but found a contradiction instead.',
+        'A familiar detail appeared in the wrong place, making the earlier warning impossible to dismiss.',
+        f'Suddenly, {consequence} pointed toward someone inside the group.',
+        'Nobody agreed on what the clue meant, and trust cracked before anyone could test it.',
+        f'{protagonist} had one choice: retreat safely, or follow the clue before it disappeared.',
+        'They followed it, and the place behind them locked shut.',
     ]
-    closing='And that was when the real story began.'
+    closing='That decision changed what the group thought the mystery was really about.'
     script=' '.join([hook]+beats+[closing])
-    if len(_words(script))>128:
-        script=' '.join(_words(script)[:126])+'.'
     title=str(project.get('title') or topic).strip()[:78]
     return {
         'script':script,
         'hook':hook,
         'title':title,
         'word_count':len(_words(script)),
-        'model':'original-fiction-retention-writer-v1',
+        'model':'original-fiction-retention-writer-v2',
         'source':None,
         'fictional':True,
     }
@@ -158,8 +165,6 @@ def write(project):
         raise RuntimeError('Source could not support enough distinct narration beats for a publishable Short.')
     closing=f'That is the part of {topic} the headline alone does not explain.'
     script=' '.join([hook]+claims+[closing])
-    if len(_words(script))>132:
-        script=' '.join(_words(script)[:130])+'.'
     return {
         'script':script,
         'hook':hook,
