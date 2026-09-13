@@ -5,14 +5,11 @@ try:
  _base_relevance=_v.relevance
  def _semantic_relevance(plan,item):
   provider=str(item.get('provider') or '')
-  # Pexels search itself is semantic, but its adapter historically copied the query into title/tags.
-  # Give it a moderate search prior instead of allowing self-inserted query text to score as a perfect match.
   if provider=='pexels':
    score=.62
    if item.get('media_type')=='video':score+=.05
    if plan.get('domain')=='nature':score+=.04
    return round(min(.74,score),3)
-  # For other providers, score only real source metadata; never the query copied into tags.
   q=set(_v.words(' '.join(plan.get('keywords') or [])))
   hay=set(_v.words(' '.join([str(item.get('title') or ''),str(item.get('description') or ''),str(item.get('credit') or '')])))
   overlap=len(q&hay)/max(1,len(q))
@@ -25,12 +22,6 @@ try:
   if overlap==0 and provider!='local-motion':score=min(score,.34)
   return round(min(1.0,score),3)
  _v.relevance=_semantic_relevance
-
- # The renderer asks choose() again when a source fails, but historically the first
- # retry could return the exact same asset because the initial choice was not yet in
- # the renderer's used set. Remember choices per scene plan so replacement attempts
- # are genuinely different and exhaust more real footage before falling back to
- # locally generated motion graphics.
  _base_choose=_v.choose
  _scene_choice_history={}
  def _resilient_choose(plan,used=None,min_score=.42,used_providers=None):
@@ -38,8 +29,7 @@ try:
   prior=_scene_choice_history.setdefault(key,set())
   merged=set(used or set())|prior
   chosen=_base_choose(plan,merged,min_score,used_providers)
-  if chosen and chosen.get('id'):
-   prior.add(chosen['id'])
+  if chosen and chosen.get('id'):prior.add(chosen['id'])
   return chosen
  _v.choose=_resilient_choose
 except Exception as e:print('Semantic visual scoring hardening unavailable:',str(e)[:240])
@@ -67,11 +57,11 @@ try:
  _install_storage_transport()
 except Exception as e:print('Resumable storage transport unavailable:',str(e)[:240])
 
-# Scene clips are intentionally short, animated segments. The old 1.20s threshold
-# rejected otherwise-moving 2-3s fallbacks for a brief hold at the end, even though
-# the assembled/final-video QC still enforces stricter whole-video freeze limits.
-# Give only intermediate clip-* files a small amount of headroom; final videos keep
-# their existing thresholds unchanged.
+try:
+ from http_hardening import install as _install_http_hardening
+ _install_http_hardening()
+except Exception as e:print('Supabase transient retry hardening unavailable:',str(e)[:240])
+
 try:
  import media_integrity as _mi
  _base_is_healthy=_mi.is_healthy
@@ -83,9 +73,6 @@ try:
  _mi.is_healthy=_scene_aware_is_healthy
 except Exception as e:print('Scene integrity alignment unavailable:',str(e)[:240])
 
-# The renderer historically planned Short scenes at ~2.8s while the finished-video
-# critic requires much faster retention pacing. Keep long-form math untouched, but
-# make the one module-level Short scene-count calculation behave like ceil(dur/1.9).
 try:
  import inspect as _inspect, math as _math
  _base_ceil=_math.ceil
@@ -99,9 +86,6 @@ try:
  _math.ceil=_retention_ceil
 except Exception as e:print('Short scene pacing alignment unavailable:',str(e)[:240])
 
-# A configured 60s Short is a ceiling/creative target, not a requirement to pad
-# strong 30-60s narration with dead air. Preserve every other final-video check,
-# while accepting healthy Shorts in that range and a still-fast <=2.5s cut cadence.
 try:
  import production_guard as _pg
  _base_final_video_qc=_pg.final_video_qc
@@ -110,26 +94,20 @@ try:
   target=float(project.get('target_duration_seconds') or 0)
   kind=str(project.get('format') or '').lower()
   short=target<=120 and kind not in ('long','longform','full','youtube','youtube video','full video','long form','long-form')
-  if not short:
-   return result
+  if not short:return result
   metrics=result.get('metrics') or {}
   dur=float(metrics.get('duration_seconds') or 0)
   cadence=float(metrics.get('average_seconds_per_visual_change') or 999)
   reasons=list(result.get('reasons') or [])
   restored=0
   if 25.0<=dur<=60.5:
-   before=len(reasons)
-   reasons=[r for r in reasons if not str(r).startswith('finished duration ')]
+   before=len(reasons);reasons=[r for r in reasons if not str(r).startswith('finished duration ')]
    if len(reasons)<before:restored+=18
   if cadence<=2.50:
-   before=len(reasons)
-   reasons=[r for r in reasons if not str(r).startswith('visual changes average every ')]
+   before=len(reasons);reasons=[r for r in reasons if not str(r).startswith('visual changes average every ')]
    if len(reasons)<before:restored+=20
   if restored:
-   result=dict(result)
-   result['reasons']=reasons
-   result['score']=min(100,round(float(result.get('score') or 0)+restored,1))
-   result['passed']=result['score']>=82 and not reasons
+   result=dict(result);result['reasons']=reasons;result['score']=min(100,round(float(result.get('score') or 0)+restored,1));result['passed']=result['score']>=82 and not reasons
   return result
  _pg.final_video_qc=_aligned_final_video_qc
 except Exception as e:print('Short final-QC alignment unavailable:',str(e)[:240])
