@@ -114,9 +114,13 @@ async function checkTokenHealth() {
       clearReconnectAlert();
       return;
     }
-    const response = await fetch('/api/youtube-token-health', {
+    const response = await fetch('/api/youtube-start', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'health' }),
     });
     const body = await response.json().catch(() => ({}));
     if (body.reconnectRequired) showReconnectAlert(body);
