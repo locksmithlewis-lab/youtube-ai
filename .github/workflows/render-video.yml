@@ -7,20 +7,10 @@ on:
     paths:
       - 'scripts/render_video.py'
       - 'scripts/render_with_metrics.py'
-      - 'scripts/storage_upload.py'
-      - 'scripts/media_integrity.py'
-      - 'scripts/visual_sources.py'
-      - 'scripts/longform_writer.py'
-      - 'scripts/generative_video.py'
-      - 'scripts/sitecustomize.py'
-      - 'scripts/production_guard.py'
-      - 'api/auto-publish-ready.js'
+      - 'scripts/engagement_overlay.py'
       - '.github/workflows/render-video.yml'
   schedule:
     - cron: '*/5 * * * *'
-  # GitHub cron delivery can be delayed. Auto quality already runs every five
-  # minutes, so its completion gives the render fleet a second independent
-  # kick without needing another secret or an external scheduler.
   workflow_run:
     workflows: ['Auto quality gate']
     types: [completed]
@@ -36,62 +26,27 @@ jobs:
   render:
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 100
       matrix:
-        include:
-          - worker: 1
-            voice: en_US-lessac-medium
-          - worker: 2
-            voice: en_GB-alba-medium
-          - worker: 3
-            voice: en_US-amy-medium
-          - worker: 4
-            voice: en_GB-alba-medium
-          - worker: 5
-            voice: en_US-lessac-medium
-          - worker: 6
-            voice: en_US-amy-medium
-          - worker: 7
-            voice: en_US-amy-medium
-          - worker: 8
-            voice: en_GB-alba-medium
+        worker: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100]
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5
-
-      - name: Cache Piper voices
-        uses: actions/cache@v4
-        with:
-          path: .piper-voices
-          key: piper-${{ matrix.voice }}-v2
-
-      - name: Restore shared visual search cache
-        uses: actions/cache@v4
-        with:
-          path: .rolixa-cache
-          key: ${{ runner.os }}-motion-visual-v6-${{ matrix.worker }}
-          restore-keys: |
-            ${{ runner.os }}-motion-visual-v6-
-            ${{ runner.os }}-motion-visual-v5-
-
-      - name: Install production renderer efficiently
-        shell: bash
+      - name: Select voice
         run: |
-          set -euo pipefail
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq ffmpeg
-          fi
-          if [ ! -f /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf ]; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq fonts-dejavu-core
-          fi
+          case $(( ${{ matrix.worker }} % 3 )) in
+            1) echo 'PIPER_VOICE=en_US-lessac-medium' >> "$GITHUB_ENV" ;;
+            2) echo 'PIPER_VOICE=en_GB-alba-medium' >> "$GITHUB_ENV" ;;
+            0) echo 'PIPER_VOICE=en_US-amy-medium' >> "$GITHUB_ENV" ;;
+          esac
+      - name: Install renderer
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core; fi
           python - <<'PY' || python -m pip install --quiet piper-tts==1.6.0
           import piper
           PY
-
-      - name: Render and immediately publish only if publish-grade QC passes
+      - name: Render with quality gates
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -99,34 +54,10 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           RUNWAYML_API_SECRET: ${{ secrets.RUNWAYML_API_SECRET }}
           LUMA_API_KEY: ${{ secrets.LUMA_API_KEY }}
-          ROLIXA_WRITER_MODEL: gpt-5.6
           GENERATIVE_VIDEO_ENABLED: '1'
           GENERATIVE_VIDEO_PERCENT: '25'
-          ROLIXA_VIDEO_BUCKET_SOFT_LIMIT: '100663296'
           PYTHONPATH: scripts
-          PIPER_VOICE: ${{ matrix.voice }}
           PIPER_VOICE_DIR: .piper-voices
           ROLIXA_VISUAL_CACHE: .rolixa-cache
           ROLIXA_WORKER: ${{ matrix.worker }}
-          PUBLISH_URL: https://riloxa-bey56lewis-4041.vercel.app/api/auto-publish-ready
-        run: |
-          set -euo pipefail
-          python scripts/render_with_metrics.py | tee render.log
-          python scripts/auto_quality.py
-          PROJECT_ID=$(python - <<'PY'
-          import re
-          text=open('render.log',encoding='utf-8',errors='ignore').read()
-          matches=re.findall(r'Rendered\s+[^/\s]+/([^/\s]+)/[^:\s]+\.mp4:',text)
-          print(matches[-1] if matches else '')
-          PY
-          )
-          if [ -z "$PROJECT_ID" ]; then
-            echo "No publish-grade rendered project found."
-            exit 0
-          fi
-          echo "Publishing QC-approved project $PROJECT_ID as Public"
-          curl --fail-with-body --retry 2 --max-time 840 \
-            -X POST "$PUBLISH_URL" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-            -H 'Content-Type: application/json' \
-            --data "{\"project_id\":\"$PROJECT_ID\"}"
+        run: python scripts/render_with_metrics.py
