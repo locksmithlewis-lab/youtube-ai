@@ -57,9 +57,10 @@ def extract_portrait_references():
         raise RuntimeError("approved BLACKSTAR portrait sprite data was not found")
 
     payload = re.sub(r"\s+", "", m.group(1))
-    # Preserve the approved sprite exactly. Recover only the narrow case where a
-    # trailing stray base64 character was appended during JS editing. We still
-    # require strict base64 plus complete JPEG SOI/EOI markers before rendering.
+    # Preserve the approved sprite exactly. Recover only narrow JS-editing damage:
+    # one stray base64 character, or at most three decoded bytes after a complete
+    # JPEG EOI marker. Strict base64, SOI/EOI and ffmpeg crop decoding still gate
+    # every render, so truncated/corrupt portrait data remains blocked.
     candidates = [payload]
     if len(payload.rstrip("=")) % 4 == 1:
         candidates.append(payload.rstrip("=")[:-1])
@@ -73,8 +74,16 @@ def extract_portrait_references():
         except Exception as exc:
             last_error = exc
             continue
-        if len(decoded) >= 1024 and decoded.startswith(b"\xff\xd8") and decoded.rstrip(b"\x00").endswith(b"\xff\xd9"):
-            raw = decoded
+        if len(decoded) < 1024 or not decoded.startswith(b"\xff\xd8"):
+            continue
+        clean = decoded.rstrip(b"\x00")
+        if clean.endswith(b"\xff\xd9"):
+            raw = clean
+            break
+        eoi = clean.rfind(b"\xff\xd9")
+        if eoi >= 1022 and len(clean) - (eoi + 2) <= 3:
+            raw = clean[:eoi + 2]
+            print(f"recovered approved portrait sprite by trimming {len(clean) - (eoi + 2)} trailing byte(s)")
             break
     if raw is None:
         detail = f": {last_error}" if last_error else ""
