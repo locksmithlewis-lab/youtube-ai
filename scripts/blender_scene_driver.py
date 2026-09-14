@@ -22,7 +22,18 @@ idx = int(seg['index'])
 shots = list(seg.get('shots') or [])
 
 scene = bpy.context.scene
-scene.render.engine = 'BLENDER_EEVEE_NEXT'
+# Blender 4.2+ uses BLENDER_EEVEE_NEXT; Ubuntu 24.04's Blender 4.0.x uses
+# BLENDER_EEVEE. Detect the supported enum instead of assuming one version.
+engine_items = {item.identifier for item in scene.bl_rna.properties['render'].fixed_type.properties['engine'].enum_items} if False else set()
+for engine in ('BLENDER_EEVEE_NEXT', 'BLENDER_EEVEE', 'CYCLES'):
+    try:
+        scene.render.engine = engine
+        print(f'Using render engine: {engine}')
+        break
+    except (TypeError, ValueError):
+        continue
+else:
+    raise RuntimeError('No supported Blender render engine found')
 scene.render.resolution_x = 1920
 scene.render.resolution_y = 1080
 scene.render.resolution_percentage = 100
@@ -51,8 +62,12 @@ def mat(name, rgba, metallic=0.0, rough=.5, emission=None):
         bsdf.inputs['Metallic'].default_value = metallic
         bsdf.inputs['Roughness'].default_value = rough
         if emission:
-            bsdf.inputs['Emission Color'].default_value = emission
-            bsdf.inputs['Emission Strength'].default_value = 4.0
+            emission_input = bsdf.inputs.get('Emission Color') or bsdf.inputs.get('Emission')
+            if emission_input:
+                emission_input.default_value = emission
+            strength_input = bsdf.inputs.get('Emission Strength')
+            if strength_input:
+                strength_input.default_value = 4.0
     return m
 
 
@@ -62,7 +77,6 @@ cyan = mat('CyanTech', (.02, .16, .20, 1), .3, .2, (.02, .8, 1.0, 1))
 amber = mat('EmergencyAmber', (.15, .06, .01, 1), .2, .3, (1.0, .24, .02, 1))
 enemy_mat = mat('VeyrCeramic', (.12, .13, .14, 1), .45, .25)
 
-# Environment: an original modular military-colony / underground set.
 bpy.ops.mesh.primitive_plane_add(size=90, location=(0, 4, 0))
 ground = bpy.context.object
 ground.name = 'BLACKSTAR_ENVIRONMENT_FLOOR'
@@ -74,8 +88,6 @@ for y in range(-8, 24, 4):
     bpy.ops.mesh.primitive_cube_add(location=(0, y, 6.8), scale=(8.5, .18, .18))
     bpy.context.object.data.materials.append(steel)
 
-# Persistent cast using stable names. Bodies are articulated from separate pieces,
-# not a single cube, so later rig/asset replacement can preserve animation hooks.
 characters = {}
 for i, ch in enumerate(bible.get('characters', [])):
     x = (i - 1.5) * 1.65
@@ -93,7 +105,6 @@ for i, ch in enumerate(bible.get('characters', [])):
         leg = bpy.context.object; leg.name = f"{ch['id']}_LEG_{'R' if sx>0 else 'L'}"; leg.data.materials.append(graphite); leg.parent = root
     characters[ch['id']] = root
 
-# Opposing Veyr units; original silhouette and luminous faceplate.
 enemies = []
 for i in range(6):
     x = -5 + i * 2.0
@@ -103,7 +114,6 @@ for i in range(6):
     bpy.ops.mesh.primitive_cube_add(location=(x,9.69+i*.5,1.78),scale=(.23,.04,.10)); f=bpy.context.object; f.data.materials.append(cyan); f.parent=root
     enemies.append(root)
 
-# Segment-specific hero props driven by shot text.
 shot_text = ' '.join(shots).lower()
 if any(k in shot_text for k in ('gateway','portal')) or idx in range(14,19):
     for r in (2.2, 2.8, 3.4):
@@ -119,7 +129,6 @@ if any(k in shot_text for k in ('dropship','landing','orbit','exterior','extract
     bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=2.5, radius2=.2, depth=4, location=(0,12.6,6), rotation=(math.pi/2,0,0))
     bpy.context.object.data.materials.append(graphite)
 
-# Controlled debris for combat/collapse segments.
 action = idx in {8,10,11,12,13,16,17,18,19}
 if action:
     for n in range(26):
@@ -133,7 +142,6 @@ if action:
         piece.location.z += 1.2 + (n%4)*.35; piece.location.x += math.sin(n)*1.1
         piece.keyframe_insert('location',frame=scene.frame_end)
 
-# Character blocking follows story phase.
 for ci, root in enumerate(characters.values()):
     root.keyframe_insert('location', frame=1)
     if idx <= 6:
@@ -148,7 +156,6 @@ for ci, root in enumerate(characters.values()):
         root.location.y += 15.0
     root.keyframe_insert('location', frame=scene.frame_end)
 
-# Enemy advance/retreat only when the story has revealed them.
 for ei, root in enumerate(enemies):
     root.hide_render = idx < 9 or idx == 20
     if not root.hide_render:
@@ -157,15 +164,12 @@ for ei, root in enumerate(enemies):
         root.location.x += math.sin(ei + idx) * 1.4
         root.keyframe_insert('location', frame=scene.frame_end)
 
-# Camera: one motivated move per shot, creating real shot changes while preserving
-# overall screen direction. Blender interpolates between the locked shot beats.
 bpy.ops.object.camera_add(location=(0,-10,3.8))
 cam=bpy.context.object; cam.name='BLACKSTAR_CAMERA'; scene.camera=cam; cam.data.lens=42
 shot_count=max(1,len(shots))
 for s in range(shot_count):
     frame = 1 + int((scene.frame_end-1) * s / max(1, shot_count-1)) if shot_count > 1 else 1
     phase = (idx * .61 + s * 1.27)
-    radius = 8.5 if not action else 6.5
     cam.location = (math.sin(phase)*3.8, -4.5 + s*(12.0/max(1,shot_count-1)), 2.4 + 1.1*math.cos(phase*.7))
     look(cam,(0, 4.5 + s*(7.0/max(1,shot_count-1)), 1.25))
     cam.data.lens = 34 + (s % 4) * 6
@@ -174,7 +178,6 @@ for s in range(shot_count):
     cam.data.keyframe_insert('lens',frame=frame)
     scene.timeline_markers.new(f'SHOT_{s+1}_{re.sub("[^A-Za-z0-9]+","_",shots[s])[:32] if shots else "BEAT"}',frame=frame)
 
-# Lighting and atmosphere.
 for name,loc,energy,size,color in [
     ('KEY',(-4,-4,7),1900,5,(.65,.80,1.0)),
     ('RIM',(5,4,5),1500,4,(.1,.65,1.0)),
@@ -188,7 +191,6 @@ vol=bpy.context.object; vol.name='ATMOSPHERE'
 vm=bpy.data.materials.new('Volume'); vm.use_nodes=True; nodes=vm.node_tree.nodes; links=vm.node_tree.links; nodes.clear()
 outn=nodes.new('ShaderNodeOutputMaterial'); p=nodes.new('ShaderNodeVolumePrincipled'); p.inputs['Density'].default_value=.006 if not action else .012; links.new(p.outputs['Volume'],outn.inputs['Volume']); vol.data.materials.append(vm); vol.display_type='WIRE'
 
-# Segment identity stored in the .blend for later audit/replacement.
 scene['episode_segment_index']=idx
 scene['continuity_in']=str(seg.get('continuity_in',''))
 scene['continuity_out']=str(seg.get('continuity_out',''))
