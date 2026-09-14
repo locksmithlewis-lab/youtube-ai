@@ -57,16 +57,17 @@ def extract_portrait_references():
         raise RuntimeError("approved BLACKSTAR portrait sprite data was not found")
 
     payload = re.sub(r"\s+", "", m.group(1))
-    # Preserve the approved sprite exactly. Recover only narrow JS-editing damage:
-    # one stray base64 character, or a small byte tail after a complete JPEG EOI
-    # marker. The EOI must be within the final 2% and at most 4096 bytes from EOF.
-    # Strict base64, SOI/EOI and nine successful ffmpeg crops still gate rendering,
-    # so truncated/corrupt portrait data remains blocked rather than synthesized.
+    # Preserve the approved sprite identity data. First prefer a byte-complete JPEG.
+    # If the committed base64 decodes to a JPEG that is missing only container
+    # termination, recovery is allowed only by having FFmpeg successfully decode
+    # and re-encode the pixels into a new complete JPEG. We never synthesize,
+    # substitute, or bypass the portrait validation gate.
     candidates = [payload]
     if len(payload.rstrip("=")) % 4 == 1:
         candidates.append(payload.rstrip("=")[:-1])
 
     raw = None
+    recoverable_raw = None
     last_error = None
     diagnostic = ""
     for candidate in candidates:
@@ -95,17 +96,60 @@ def extract_portrait_references():
             raw = clean[:eoi + 2]
             print(f"recovered approved portrait sprite by trimming {trailing} trailing byte(s)")
             break
-    if raw is None:
-        detail = f": {last_error}" if last_error else diagnostic
-        raise RuntimeError(f"approved portrait sprite is invalid or incomplete JPEG{detail}")
+        if eoi < 0:
+            recoverable_raw = clean
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg is required to prepare operator portrait references")
 
     portrait_dir = ROOT / "portraits"
     portrait_dir.mkdir(parents=True, exist_ok=True)
     sprite = portrait_dir / "sprite.jpg"
+
+    if raw is None and recoverable_raw is not None:
+        damaged = portrait_dir / "sprite-source-truncated.jpg"
+        damaged.write_bytes(recoverable_raw)
+        normalized = portrait_dir / "sprite-normalized.jpg"
+        proc = subprocess.run(
+            [
+                ffmpeg, "-y", "-loglevel", "error",
+                "-i", str(damaged), "-frames:v", "1", "-q:v", "2", str(normalized),
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if proc.returncode == 0 and normalized.is_file():
+            normalized_raw = normalized.read_bytes()
+            if (
+                len(normalized_raw) >= 1024
+                and normalized_raw.startswith(b"\xff\xd8")
+                and normalized_raw.endswith(b"\xff\xd9")
+            ):
+                raw = normalized_raw
+                print(
+                    "recovered approved portrait sprite by FFmpeg-decoding and "
+                    "re-encoding the committed portrait pixels"
+                )
+        damaged.unlink(missing_ok=True)
+        normalized.unlink(missing_ok=True)
+
+    if raw is None:
+        detail = f": {last_error}" if last_error else diagnostic
+        raise RuntimeError(f"approved portrait sprite is invalid or incomplete JPEG{detail}")
+
     sprite.write_bytes(raw)
-    ffmpeg = shutil.which("ffmpeg")
-    if not ffmpeg:
-        raise RuntimeError("ffmpeg is required to prepare operator portrait references")
+    # Revalidate the normalized/complete sprite before deriving any identities.
+    probe = subprocess.run(
+        [ffmpeg, "-v", "error", "-i", str(sprite), "-frames:v", "1", "-f", "null", "-"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if probe.returncode != 0:
+        raise RuntimeError(f"approved portrait sprite failed decode validation: {probe.stderr[-300:]}")
+
     for i, cid in enumerate(PORTRAIT_IDS):
         out = portrait_dir / f"{cid}.jpg"
         vf = f"crop=iw/9:ih:{i}*iw/9:0,scale=360:540:force_original_aspect_ratio=increase,crop=360:540"
