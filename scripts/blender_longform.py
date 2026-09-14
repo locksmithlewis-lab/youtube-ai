@@ -50,26 +50,35 @@ def extract_portrait_references():
     """Decode the Rolixa portrait sprite and crop deterministic identity references."""
     overlay = Path("blackstar-portrait-overlay.js")
     if not overlay.exists():
-        print("portrait overlay not present; Blender will use procedural face fallback")
-        return
+        raise RuntimeError("approved BLACKSTAR portrait overlay is missing")
     text = overlay.read_text(encoding="utf-8", errors="ignore")
     m = re.search(r"BLACKSTAR_PORTRAIT_SPRITE=['\"]data:image/jpeg;base64,([^'\"]+)", text)
     if not m:
-        print("portrait sprite data not found; Blender will use procedural face fallback")
-        return
+        raise RuntimeError("approved BLACKSTAR portrait sprite data was not found")
+
+    # Browser data URLs tolerate omitted terminal padding; Python's decoder does not.
+    payload = re.sub(r"\s+", "", m.group(1))
+    payload += "=" * (-len(payload) % 4)
+    try:
+        raw = base64.b64decode(payload, validate=True)
+    except Exception as exc:
+        raise RuntimeError(f"approved portrait sprite is invalid base64: {exc}") from exc
+    if len(raw) < 1024 or not raw.startswith(b"\xff\xd8"):
+        raise RuntimeError("approved portrait sprite did not decode to a valid JPEG")
+
     portrait_dir = ROOT / "portraits"
     portrait_dir.mkdir(parents=True, exist_ok=True)
     sprite = portrait_dir / "sprite.jpg"
-    sprite.write_bytes(base64.b64decode(m.group(1)))
+    sprite.write_bytes(raw)
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
-        print("ffmpeg unavailable for portrait crops; procedural face fallback")
-        return
+        raise RuntimeError("ffmpeg is required to prepare operator portrait references")
     for i, cid in enumerate(PORTRAIT_IDS):
         out = portrait_dir / f"{cid}.jpg"
-        # The approved sprite is nine equal vertical portrait panels.
         vf = f"crop=iw/9:ih:{i}*iw/9:0,scale=360:540:force_original_aspect_ratio=increase,crop=360:540"
         subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-i", str(sprite), "-vf", vf, "-q:v", "2", str(out)], check=True)
+        if not out.is_file() or out.stat().st_size < 512:
+            raise RuntimeError(f"portrait crop failed for {cid}")
     print(f"prepared {len(PORTRAIT_IDS)} BLACKSTAR/RED VECTOR identity references")
 
 
