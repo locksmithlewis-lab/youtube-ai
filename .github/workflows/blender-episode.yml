@@ -26,10 +26,13 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v5
-      - name: Install Blender and media tools
+      - name: Install Blender, media and local voice tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq blender ffmpeg fonts-dejavu-core
+          python -m pip install --quiet piper-tts==1.6.0
+          mkdir -p .piper-voices
+          python -m piper.download_voices --data-dir .piper-voices en_US-lessac-medium en_GB-alba-medium en_US-amy-medium
           blender --version
           ffmpeg -version | head -n 1
       - name: Stage episode manifest
@@ -48,6 +51,7 @@ jobs:
               assert 50 <= float(s.get('duration',0)) <= 70
               assert s.get('shots')
               assert s.get('continuity_in') and s.get('continuity_out')
+              assert s.get('dialogue'), f'segment {i} missing dialogue'
           print('manifest validated')
           PY
       - name: Render continuity-locked segment
@@ -57,7 +61,13 @@ jobs:
           ROLIXA_LONGFORM_FPS: '24'
           ROLIXA_EPISODE_DIR: .rolixa-episode
         run: python scripts/blender_longform.py
-      - name: Verify segment
+      - name: Master dialogue ambience and fictional SFX
+        env:
+          ROLIXA_WORKER: ${{ matrix.worker }}
+          ROLIXA_EPISODE_DIR: .rolixa-episode
+          PIPER_VOICE_DIR: .piper-voices
+        run: python scripts/blender_segment_audio.py
+      - name: Verify segment audio and duration
         env:
           WORKER: ${{ matrix.worker }}
         run: |
@@ -70,6 +80,7 @@ jobs:
           assert 50 <= d <= 70, f'bad segment duration {d}'
           print(f'segment duration {d:.2f}s')
           PY
+          ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,sample_rate,channels -of json "$F" | grep -q codec_name
       - name: Upload segment artifact
         uses: actions/upload-artifact@v4
         with:
@@ -110,10 +121,12 @@ jobs:
           ROLIXA_EPISODE_DIR: .rolixa-episode
           ROLIXA_LONGFORM_SEGMENTS: '20'
         run: python scripts/assemble_blender_episode.py
-      - name: Validate master
+      - name: Validate master A/V
         run: |
           test -s .rolixa-episode/episode-master.mp4
-          ffprobe -v error -show_entries format=duration,width,height -of json .rolixa-episode/episode-master.mp4
+          ffprobe -v error -show_entries format=duration -show_entries stream=codec_type,width,height,codec_name -of json .rolixa-episode/episode-master.mp4
+          ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0:s=x .rolixa-episode/episode-master.mp4 | grep -q '^1920x1080$'
+          ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of csv=p=0 .rolixa-episode/episode-master.mp4 | grep -q .
       - name: Upload finished episode
         uses: actions/upload-artifact@v4
         with:
