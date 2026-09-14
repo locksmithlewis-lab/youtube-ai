@@ -67,6 +67,7 @@ jobs:
           path: .blackstar-library
           if-no-files-found: error
           retention-days: 14
+          include-hidden-files: true
 
   render-segment:
     needs: build-common-library
@@ -160,6 +161,7 @@ jobs:
             .rolixa-episode/segment-*.blend
           if-no-files-found: error
           retention-days: 7
+          include-hidden-files: true
 
   assemble-register-publish:
     needs: render-segment
@@ -231,3 +233,4 @@ jobs:
           path: .rolixa-episode/episode-master.mp4
           if-no-files-found: error
           retention-days: 14
+          include-hidden-files: true
