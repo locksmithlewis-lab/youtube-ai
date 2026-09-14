@@ -56,15 +56,29 @@ def extract_portrait_references():
     if not m:
         raise RuntimeError("approved BLACKSTAR portrait sprite data was not found")
 
-    # Browser data URLs tolerate omitted terminal padding; Python's decoder does not.
     payload = re.sub(r"\s+", "", m.group(1))
-    payload += "=" * (-len(payload) % 4)
-    try:
-        raw = base64.b64decode(payload, validate=True)
-    except Exception as exc:
-        raise RuntimeError(f"approved portrait sprite is invalid base64: {exc}") from exc
-    if len(raw) < 1024 or not raw.startswith(b"\xff\xd8"):
-        raise RuntimeError("approved portrait sprite did not decode to a valid JPEG")
+    # Preserve the approved sprite exactly. Recover only the narrow case where a
+    # trailing stray base64 character was appended during JS editing. We still
+    # require strict base64 plus complete JPEG SOI/EOI markers before rendering.
+    candidates = [payload]
+    if len(payload.rstrip("=")) % 4 == 1:
+        candidates.append(payload.rstrip("=")[:-1])
+
+    raw = None
+    last_error = None
+    for candidate in candidates:
+        padded = candidate + "=" * (-len(candidate) % 4)
+        try:
+            decoded = base64.b64decode(padded, validate=True)
+        except Exception as exc:
+            last_error = exc
+            continue
+        if len(decoded) >= 1024 and decoded.startswith(b"\xff\xd8") and decoded.rstrip(b"\x00").endswith(b"\xff\xd9"):
+            raw = decoded
+            break
+    if raw is None:
+        detail = f": {last_error}" if last_error else ""
+        raise RuntimeError(f"approved portrait sprite is invalid or incomplete JPEG{detail}")
 
     portrait_dir = ROOT / "portraits"
     portrait_dir.mkdir(parents=True, exist_ok=True)
