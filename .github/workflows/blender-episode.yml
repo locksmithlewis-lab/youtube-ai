@@ -36,10 +36,21 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v5
-      - name: Install Blender, media and local voice tools
+      - name: Install Blender, headless graphics, media and local voice tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq blender ffmpeg fonts-dejavu-core
+          sudo apt-get install -y -qq \
+            blender \
+            ffmpeg \
+            fonts-dejavu-core \
+            libegl1 \
+            libegl-mesa0 \
+            libgl1 \
+            libglx-mesa0 \
+            libgbm1 \
+            libgles2 \
+            mesa-utils
+          ldconfig -p | grep -E 'libEGL\.so\.1|libGL\.so\.1|libgbm\.so\.1'
           python -m pip install --quiet piper-tts==1.6.0
           mkdir -p .piper-voices
           python -m piper.download_voices --data-dir .piper-voices en_US-lessac-medium en_GB-alba-medium en_US-amy-medium
