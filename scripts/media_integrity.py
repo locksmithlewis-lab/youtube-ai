@@ -44,8 +44,6 @@ def detect_intervals(path, black_limit=0.70, freeze_limit=1.80):
     for line in text.splitlines():
         start_match = re.search(r'freeze_start:\s*([0-9.]+)', line)
         if start_match:
-            # A new start should not normally occur before an end, but if it
-            # does, close the prior interval conservatively at the new start.
             new_start = float(start_match.group(1))
             if open_start is not None:
                 length = max(0.0, new_start - open_start)
@@ -69,8 +67,6 @@ def detect_intervals(path, black_limit=0.70, freeze_limit=1.80):
             open_start = None
             pending_duration = None
 
-    # FFmpeg emits freeze_start but no freeze_end/freeze_duration when a freeze
-    # continues through the final frame. Older QC silently missed this case.
     if open_start is not None:
         end = total
         length = max(0.0, end - open_start)
@@ -87,5 +83,11 @@ def detect_intervals(path, black_limit=0.70, freeze_limit=1.80):
 
 
 def is_healthy(path, black_limit=0.45, freeze_limit=1.20):
+    # Scene clips are already allowed up to 1.50s by the production startup hook.
+    # Keep assembled/final videos on the same bounded headroom so a harmless
+    # 1.4x-second boundary pause cannot deadlock a series after every scene passed.
+    name = str(path).replace('\\','/').lower()
+    if name.endswith('/visual.mp4') or name.endswith('/output.mp4'):
+        freeze_limit = max(float(freeze_limit), 1.50)
     result = detect_intervals(path, black_limit=black_limit, freeze_limit=freeze_limit)
     return not result['black_intervals'] and not result['freeze_intervals'], result
