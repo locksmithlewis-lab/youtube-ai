@@ -11,6 +11,9 @@ on:
     branches: [main]
     paths:
       - 'episodes/blackstar-s01e01/episode.json'
+      - 'episodes/blackstar-s01e01/screenplay.md'
+      - 'blackstar-portrait-overlay.js'
+      - 'scripts/audit_blackstar_episode.py'
       - 'scripts/build_blackstar_common_library.py'
       - 'scripts/blender_common_library_bootstrap.py'
       - 'scripts/blender_longform.py'
@@ -28,7 +31,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Audit Episode 1 story and render contract
+        env:
+          EPISODE_MANIFEST: ${{ inputs.episode_manifest || 'episodes/blackstar-s01e01/episode.json' }}
+        run: python scripts/audit_blackstar_episode.py "$EPISODE_MANIFEST"
+      - name: Compile production Python
+        run: |
+          python -m py_compile \
+            scripts/audit_blackstar_episode.py \
+            scripts/build_blackstar_common_library.py \
+            scripts/blender_common_library_bootstrap.py \
+            scripts/blender_longform.py \
+            scripts/blender_scene_driver.py \
+            scripts/blender_segment_audio.py \
+            scripts/assemble_blender_episode.py \
+            scripts/register_blender_episode.py
+
   build-common-library:
+    needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -77,7 +102,7 @@ jobs:
       matrix:
         worker: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5
       - name: Download shared environment library
@@ -112,26 +137,16 @@ jobs:
           test -f "$EPISODE_MANIFEST"
           mkdir -p .rolixa-episode
           cp "$EPISODE_MANIFEST" .rolixa-episode/episode.json
-          python - <<'PY'
-          import json
-          p=json.load(open('.rolixa-episode/episode.json',encoding='utf-8'))
-          assert len(p.get('segments',[])) == 20, 'episode requires exactly 20 segments'
-          for i,s in enumerate(p['segments'],1):
-              assert s.get('index') == i
-              assert 50 <= float(s.get('duration',0)) <= 70
-              assert s.get('shots')
-              assert s.get('continuity_in') and s.get('continuity_out')
-              assert s.get('dialogue'), f'segment {i} missing dialogue'
-          print('manifest validated')
-          PY
+          python scripts/audit_blackstar_episode.py "$EPISODE_MANIFEST"
       - name: Render continuity-locked segment
         env:
+          PYTHONUNBUFFERED: '1'
           ROLIXA_WORKER: ${{ matrix.worker }}
           ROLIXA_LONGFORM_SEGMENTS: '20'
           ROLIXA_LONGFORM_FPS: '24'
           ROLIXA_EPISODE_DIR: .rolixa-episode
           BLACKSTAR_LIBRARY_DIR: .blackstar-library
-        run: python scripts/blender_longform.py
+        run: timeout --signal=TERM 95m python scripts/blender_longform.py
       - name: Master dialogue ambience and fictional SFX
         env:
           ROLIXA_WORKER: ${{ matrix.worker }}
@@ -184,6 +199,7 @@ jobs:
           EPISODE_MANIFEST: ${{ inputs.episode_manifest || 'episodes/blackstar-s01e01/episode.json' }}
         run: |
           cp "$EPISODE_MANIFEST" .rolixa-episode/episode.json
+          python scripts/audit_blackstar_episode.py "$EPISODE_MANIFEST"
           python - <<'PY'
           from pathlib import Path
           root=Path('.rolixa-episode')
@@ -221,7 +237,7 @@ jobs:
         run: |
           test -n "$SERVICE_KEY"
           RESPONSE=$(curl --fail-with-body --retry 2 --max-time 840 \
-            -X POST 'https://riloxa-bey56lewis-4041.vercel.app/api/auto-publish-ready' \
+            -X POST 'https://rolixa-git-main-bey56lewis-4041.vercel.app/api/auto-publish-ready' \
             -H "Authorization: Bearer $SERVICE_KEY" \
             -H 'Content-Type: application/json' \
             --data '{}')
