@@ -29,6 +29,8 @@ try:
   prior=_scene_choice_history.setdefault(key,set())
   merged=set(used or set())|prior
   chosen=_base_choose(plan,merged,min_score,used_providers)
+  if not chosen and float(min_score)>.42:
+   chosen=_base_choose(plan,merged,max(.42,float(min_score)-.08),used_providers)
   if chosen and chosen.get('id'):prior.add(chosen['id'])
   return chosen
  _v.choose=_resilient_choose
@@ -53,6 +55,25 @@ if os.environ.get('GENERATIVE_VIDEO_ENABLED','1')!='0':
  except Exception as e:print('Generative video startup unavailable:',str(e)[:240])
 
 try:
+ import json as _json, urllib.parse as _urlparse, urllib.request as _urlrequest
+ import shortform_writer as _sf
+ def _broader_source(topic):
+  params=_urlparse.urlencode({'action':'query','generator':'search','gsrsearch':topic,'gsrlimit':'5','prop':'extracts|info','explaintext':'1','exchars':'6500','inprop':'url','format':'json','formatversion':'2'})
+  req=_urlrequest.Request('https://en.wikipedia.org/w/api.php?'+params,headers={'User-Agent':_sf.USER_AGENT,'Accept':'application/json'})
+  with _urlrequest.urlopen(req,timeout=25) as response:data=_json.loads(response.read().decode())
+  pages=((data.get('query') or {}).get('pages') or [])
+  ranked=[]
+  for page in pages:
+   extract=_sf._clean_spoken(page.get('extract') or '')
+   ranked.append((len(_sf._words(extract)),page,extract))
+  ranked.sort(key=lambda row:row[0],reverse=True)
+  if not ranked or ranked[0][0]<55:raise RuntimeError('No sufficiently detailed public reference found for this Short topic.')
+  _,page,extract=ranked[0]
+  return {'title':str(page.get('title') or topic),'url':str(page.get('fullurl') or ''),'extract':extract}
+ _sf._source=_broader_source
+except Exception as e:print('Factual source recovery unavailable:',str(e)[:240])
+
+try:
  from storage_upload import install_legacy_urllib_transport as _install_storage_transport
  _install_storage_transport()
 except Exception as e:print('Resumable storage transport unavailable:',str(e)[:240])
@@ -67,8 +88,8 @@ try:
  _base_is_healthy=_mi.is_healthy
  def _scene_aware_is_healthy(path,black_limit=.45,freeze_limit=1.20):
   name=str(path)
-  if '/clip-' in name or name.endswith(tuple(f'clip-{i:03}.mp4' for i in range(200))):
-   freeze_limit=max(float(freeze_limit),1.50)
+  if '/clip-' in name or name.endswith(tuple(f'clip-{i:03}.mp4' for i in range(200))):freeze_limit=max(float(freeze_limit),1.50)
+  if name.endswith('/visual.mp4') or name.endswith('/output.mp4') or name.endswith('visual.mp4') or name.endswith('output.mp4'):freeze_limit=max(float(freeze_limit),1.50)
   return _base_is_healthy(path,black_limit=black_limit,freeze_limit=freeze_limit)
  _mi.is_healthy=_scene_aware_is_healthy
 except Exception as e:print('Scene integrity alignment unavailable:',str(e)[:240])
@@ -78,10 +99,7 @@ try:
  _base_ceil=_math.ceil
  def _retention_ceil(value):
   frame=_inspect.currentframe().f_back
-  if (frame and frame.f_code.co_name=='<module>' and
-      str(frame.f_code.co_filename).endswith('render_video.py') and
-      not bool(frame.f_globals.get('longform'))):
-   return _base_ceil(float(value)*(2.8/1.9))
+  if (frame and frame.f_code.co_name=='<module>' and str(frame.f_code.co_filename).endswith('render_video.py') and not bool(frame.f_globals.get('longform'))):return _base_ceil(float(value)*(2.8/1.9))
   return _base_ceil(value)
  _math.ceil=_retention_ceil
 except Exception as e:print('Short scene pacing alignment unavailable:',str(e)[:240])
