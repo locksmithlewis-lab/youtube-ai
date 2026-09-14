@@ -1,4 +1,4 @@
-"""Create dialogue, ambience and non-realistic cinematic SFX for one Blender segment.
+"""Create dialogue, ambience and fictional cinematic SFX for one Blender segment.
 
 Uses local Piper TTS voices and FFmpeg only. This intentionally creates fictional
 cinematic sound design, not recordings or instructions for real weapons.
@@ -23,6 +23,8 @@ VOICE_MAP = {
     'VALE': 'en_GB-alba-medium',
     'ROOK': 'en_US-lessac-medium',
     'KESTREL': 'en_GB-alba-medium',
+    'VEYR COMMANDER': 'en_US-lessac-medium',
+    'UNKNOWN RED VECTOR VOICE': 'en_US-amy-medium',
 }
 
 
@@ -31,12 +33,14 @@ def run(cmd):
 
 
 def parse_dialogue(text):
-    parts = re.split(r'\b([A-Z][A-Z0-9_]+):\s*', text or '')
+    # Multi-word labels are required for VEYR COMMANDER and RED VECTOR's final sting.
+    matches = list(re.finditer(r'(?:(?<=^)|(?<=\s))([A-Z][A-Z0-9_ ]{0,40}?):\s*', text or ''))
     out = []
-    for i in range(1, len(parts), 2):
-        speaker = parts[i].strip()
-        line = parts[i + 1].strip() if i + 1 < len(parts) else ''
-        line = re.sub(r'\s+', ' ', line).strip(' .')
+    for i, match in enumerate(matches):
+        speaker = match.group(1).strip()
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        line = re.sub(r'\s+', ' ', text[start:end]).strip(' .')
         if line:
             out.append((speaker, line + '.'))
     return out
@@ -55,8 +59,7 @@ def synth_line(speaker, text, dst):
         '-f', str(raw), '--', text,
     ]
     run(cmd)
-    # Normalize every voice to a common format before mixing.
-    run(['ffmpeg', '-y', '-i', str(raw), '-ar', '48000', '-ac', '1', '-c:a', 'pcm_s16le', str(dst)])
+    run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(raw), '-ar', '48000', '-ac', '1', '-c:a', 'pcm_s16le', str(dst)])
 
 
 def main():
@@ -66,6 +69,8 @@ def main():
     lines = parse_dialogue(seg.get('dialogue', ''))
     if not VIDEO.exists():
         raise SystemExit(f'missing visual segment {VIDEO}')
+    if not lines:
+        raise SystemExit(f'no parseable dialogue found for segment {WORKER}')
 
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
@@ -82,12 +87,14 @@ def main():
             delays.append(int(cursor * 1000))
             cursor += d + 0.55
 
+        if not inputs:
+            raise SystemExit(f'dialogue did not fit segment {WORKER}')
+
         filters = []
         maps = []
-        ff = ['ffmpeg', '-y', '-i', str(VIDEO)]
+        ff = ['ffmpeg', '-y', '-loglevel', 'error', '-i', str(VIDEO)]
         for wav in inputs:
             ff += ['-i', str(wav)]
-        # Local atmospheric bed: filtered noise + low synth hum.
         ff += ['-f', 'lavfi', '-i', f'anoisesrc=color=pink:amplitude=0.012:sample_rate=48000:d={duration}']
         noise_idx = 1 + len(inputs)
         ff += ['-f', 'lavfi', '-i', f'sine=frequency=52:sample_rate=48000:duration={duration}']
@@ -100,7 +107,6 @@ def main():
             filters.append(f'[{i}:a]adelay={delay}|{delay},volume=1.25[{label}]')
             maps.append(f'[{label}]')
 
-        # Add clearly fictional cinematic pulse impacts during action-heavy segments.
         action = WORKER in {8, 10, 11, 12, 13, 16, 17, 18, 19}
         if action:
             ff += ['-f', 'lavfi', '-i', f'sine=frequency=82:sample_rate=48000:duration={duration}']
@@ -108,8 +114,11 @@ def main():
             filters.append(f'[{fx_idx}:a]tremolo=f=1.8:d=0.82,lowpass=f=180,volume=0.08[fx]')
             maps.append('[fx]')
 
-        mix = ''.join(maps)
-        filters.append(f'{mix}amix=inputs={len(maps)}:duration=longest:normalize=0,acompressor=threshold=-18dB:ratio=2.2:attack=8:release=180,loudnorm=I=-14:TP=-1.5:LRA=9[aout]')
+        filters.append(
+            f"{''.join(maps)}amix=inputs={len(maps)}:duration=longest:normalize=0,"
+            'acompressor=threshold=-18dB:ratio=2.2:attack=8:release=180,'
+            'loudnorm=I=-14:TP=-1.5:LRA=9[aout]'
+        )
         mastered = td / 'mastered.mp4'
         ff += [
             '-filter_complex', ';'.join(filters), '-map', '0:v:0', '-map', '[aout]',
@@ -118,7 +127,7 @@ def main():
         ]
         run(ff)
         mastered.replace(VIDEO)
-        print(f'AUDIO_MASTERED {VIDEO} voices={len(inputs)} action_fx={action}')
+        print(f'AUDIO_MASTERED {VIDEO} voices={len(inputs)} speakers={[s for s,_ in lines]} action_fx={action}')
 
 
 if __name__ == '__main__':
