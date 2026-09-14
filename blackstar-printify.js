@@ -8,6 +8,8 @@ function ensurePanel(){
   if(!merch)return null;
   let panel=document.getElementById('blackstarPrintify');
   if(panel)return panel;
+  const stale=[...merch.children].find(el=>el.classList?.contains('bs-card'));
+  if(stale)stale.remove();
   panel=document.createElement('section');
   panel.id='blackstarPrintify';
   panel.className='bs-card';
