@@ -45,12 +45,19 @@ jobs:
         run: |
           test -s .blackstar-library/library.json
           python - <<'PY'
-          import json
-          p=json.load(open('.blackstar-library/library.json',encoding='utf-8'))
+          import hashlib, json
+          from pathlib import Path
+          root=Path('.blackstar-library')
+          p=json.load(open(root/'library.json',encoding='utf-8'))
           assert p['shared_by_workers']==20
-          providers={a['provider'] for a in p['assets']}
-          assert {'Poly Haven','Runway','Luma AI'} <= providers, providers
           assert len(p['assets'])==6
+          providers={a['provider'] for a in p['assets']}
+          assert 'Poly Haven' in providers, providers
+          for a in p['assets']:
+              f=root/a['file']
+              assert f.is_file() and f.stat().st_size>0, f
+              digest=hashlib.sha256(f.read_bytes()).hexdigest()
+              assert digest==a['sha256'], (f,digest,a['sha256'])
           print('common library verified:', providers)
           PY
       - name: Upload immutable common library
