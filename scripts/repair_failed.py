@@ -83,7 +83,7 @@ for p in rows:
     membership=series_membership(p['id'])
     if membership:report(p,False,50,['series-linked failure is owned by the ordered continuity controller'],{'series_id':membership.get('series_id'),'episode_number':membership.get('episode_number'),'previous_failure':p.get('failure_reason')});waiting+=1;series_owned+=1;continue
     reason=str(p.get('failure_reason') or '').lower();attempts=int(p.get('qc_attempts') or 0)
-    if attempts>=2:report(p,False,0,['automatic repair limit reached'],{'previous_failure':reason,'attempts':attempts});discarded+=1;continue
+    if attempts>=4:report(p,False,0,['automatic repair limit reached'],{'previous_failure':reason,'attempts':attempts});discarded+=1;continue
     leaks=instruction_leaks(str(p.get('script') or ''))
     if leaks or any(x in reason for x in creative_faults):
         try:
