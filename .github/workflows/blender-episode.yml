@@ -11,6 +11,8 @@ on:
     branches: [main]
     paths:
       - 'episodes/blackstar-s01e01/episode.json'
+      - 'scripts/build_blackstar_common_library.py'
+      - 'scripts/blender_common_library_bootstrap.py'
       - 'scripts/blender_longform.py'
       - 'scripts/blender_scene_driver.py'
       - 'scripts/blender_segment_audio.py'
@@ -26,7 +28,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build-common-library:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install generation client
+        run: python -m pip install --quiet runwayml
+      - name: Build locked multi-source environment library
+        env:
+          BLACKSTAR_LIBRARY_DIR: .blackstar-library
+          RUNWAYML_API_SECRET: ${{ secrets.RUNWAYML_API_SECRET }}
+          LUMA_API_KEY: ${{ secrets.LUMA_API_KEY }}
+        run: python scripts/build_blackstar_common_library.py
+      - name: Verify common library provenance
+        run: |
+          test -s .blackstar-library/library.json
+          python - <<'PY'
+          import json
+          p=json.load(open('.blackstar-library/library.json',encoding='utf-8'))
+          assert p['shared_by_workers']==20
+          providers={a['provider'] for a in p['assets']}
+          assert {'Poly Haven','Runway','Luma AI'} <= providers, providers
+          assert len(p['assets'])==6
+          print('common library verified:', providers)
+          PY
+      - name: Upload immutable common library
+        uses: actions/upload-artifact@v4
+        with:
+          name: blackstar-common-library
+          path: .blackstar-library
+          if-no-files-found: error
+          retention-days: 14
+
   render-segment:
+    needs: build-common-library
     strategy:
       fail-fast: false
       max-parallel: 20
@@ -36,6 +72,11 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v5
+      - name: Download shared environment library
+        uses: actions/download-artifact@v5
+        with:
+          name: blackstar-common-library
+          path: .blackstar-library
       - name: Install Blender, headless graphics, media and local voice tools
         run: |
           sudo apt-get update -qq
@@ -81,6 +122,7 @@ jobs:
           ROLIXA_LONGFORM_SEGMENTS: '20'
           ROLIXA_LONGFORM_FPS: '24'
           ROLIXA_EPISODE_DIR: .rolixa-episode
+          BLACKSTAR_LIBRARY_DIR: .blackstar-library
         run: python scripts/blender_longform.py
       - name: Master dialogue ambience and fictional SFX
         env:
