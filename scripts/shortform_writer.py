@@ -82,20 +82,22 @@ def needs_script(project):
 
 def _source(topic):
     params=urllib.parse.urlencode({
-        'action':'query','generator':'search','gsrsearch':topic,'gsrlimit':'1',
-        'prop':'extracts|info','exintro':'1','explaintext':'1','inprop':'url',
+        'action':'query','generator':'search','gsrsearch':topic,'gsrlimit':'5',
+        'prop':'extracts|info','explaintext':'1','exchars':'6500','inprop':'url',
         'format':'json','formatversion':'2'
     })
     req=urllib.request.Request('https://en.wikipedia.org/w/api.php?'+params,headers={'User-Agent':USER_AGENT,'Accept':'application/json'})
-    with urllib.request.urlopen(req,timeout=20) as response:
+    with urllib.request.urlopen(req,timeout=25) as response:
         data=json.loads(response.read().decode())
     pages=((data.get('query') or {}).get('pages') or [])
-    if not pages:
-        raise RuntimeError('No reliable public reference found for this Short topic.')
-    page=pages[0]
-    extract=_clean_spoken(page.get('extract') or '')
-    if len(_words(extract))<45:
-        raise RuntimeError('Public reference is too thin to support a publishable factual Short.')
+    ranked=[]
+    for page in pages:
+        extract=_clean_spoken(page.get('extract') or '')
+        ranked.append((len(_words(extract)),page,extract))
+    ranked.sort(key=lambda row:row[0],reverse=True)
+    if not ranked or ranked[0][0]<55:
+        raise RuntimeError('No sufficiently detailed public reference found for this Short topic.')
+    _,page,extract=ranked[0]
     return {'title':str(page.get('title') or topic),'url':str(page.get('fullurl') or ''),'extract':extract}
 
 
