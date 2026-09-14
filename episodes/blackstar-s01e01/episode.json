@@ -1,0 +1,55 @@
+{
+  "episode": {
+    "series": "BLACKSTAR",
+    "season": 1,
+    "episode": 1,
+    "title": "First Contact",
+    "target_duration_seconds": 1200,
+    "aspect": "16:9",
+    "rating": "teen",
+    "style": "original cinematic military science fiction animation"
+  },
+  "bible": {
+    "visual_style": "grounded near-future military science fiction, graphite armor, restrained cyan diagnostics, practical industrial lighting, realistic weight, no copyrighted franchise designs",
+    "camera": "35-50mm cinematic lenses, motivated handheld only during combat, smooth dolly and crane moves during discovery scenes, consistent 180-degree screen direction across cuts",
+    "palette": "graphite, steel blue, amber emergency light, cyan technology accents",
+    "characters": [
+      {"id":"MARA_VOSS","name":"Commander Mara Voss","role":"squad leader","voice":"low controlled female","armor":"graphite command armor with narrow cyan shoulder stripe"},
+      {"id":"JAX_MERCER","name":"Jax Mercer","role":"heavy weapons","voice":"rough warm male","armor":"heavy graphite armor with amber utility markings"},
+      {"id":"IMANI_VALE","name":"Dr. Imani Vale","role":"combat engineer","voice":"precise female","armor":"graphite technical armor with compact tool rig"},
+      {"id":"ROOK","name":"Rook","role":"recon","voice":"younger alert male","armor":"light graphite recon armor with compact sensor mast"}
+    ],
+    "ai_character": {"id":"KESTREL","name":"Kestrel","voice":"calm synthetic female"},
+    "enemy": "Veyr: original biomechanical soldiers with segmented ceramic armor and luminous geometric faceplates",
+    "weapons": "fictional directed-energy and coil-propelled cinematic props; visually original; no real-world construction detail",
+    "continuity_rules": [
+      "character armor, proportions and markings remain identical across all twenty segments",
+      "weapons stay on the same side of each character unless a shot explicitly shows the handoff",
+      "injury and dirt state only increase unless cleaned on screen",
+      "segment opening camera and character positions inherit continuity_out from previous segment",
+      "music key, ambience and room tone crossfade across segment seams"
+    ]
+  },
+  "segments": [
+    {"index":1,"duration":60,"continuity_in":"black screen","continuity_out":"dropship descending toward Erebus colony","shots":["black with fragmented emergency audio","orbital debris reveal","dropship crosses frame","atmospheric entry exterior","cockpit approach to colony"],"dialogue":"KESTREL: Erebus Colony stopped transmitting eleven hours ago. VOSS: No distress beacon? KESTREL: None."},
+    {"index":2,"duration":60,"continuity_in":"dropship descent","continuity_out":"rear ramp opening on empty landing pad","shots":["squad interior wide","Voss checks team","Vale studies colony map","Jax locks heavy fictional rifle","Rook watches silent city through viewport"],"dialogue":"VOSS: We go quiet until we know what happened. JAX: Thirty-eight thousand people do not go quiet. VALE: They do if someone makes them."},
+    {"index":3,"duration":60,"continuity_in":"ramp opening","continuity_out":"squad entering main street","shots":["landing dust","boots on ramp","empty colony wide","abandoned service carts","squad forms diamond formation"],"dialogue":"ROOK: No bodies. No evacuation traffic. VOSS: Then we find out where everyone went."},
+    {"index":4,"duration":60,"continuity_in":"main street search","continuity_out":"Rook kneeling over underground signal marker","shots":["cafeteria with untouched meals","open apartment doors","spinning factory machinery","helmet camera insert","sensor ping under pavement"],"dialogue":"VALE: Power grid is still carrying full load. ROOK: Movement below us. Slow. Organized."},
+    {"index":5,"duration":60,"continuity_in":"sensor marker","continuity_out":"elevator doors closing on squad","shots":["service hatch forced open","vertical shaft reveal","industrial elevator powers on","Voss assigns sectors","doors close"],"dialogue":"VOSS: Kestrel, keep the ship hot. KESTREL: I dislike that expression, but acknowledged."},
+    {"index":6,"duration":60,"continuity_in":"elevator descent","continuity_out":"squad facing freshly cut alien geometry","shots":["elevator cage descending","headlamps through fog","sparks from old conduits","metal wall cut into geometric pattern","Vale scans residue"],"dialogue":"VALE: This cut is hours old. Not mining equipment. JAX: Then whoever made it is still here."},
+    {"index":7,"duration":60,"continuity_in":"alien geometry","continuity_out":"dead drone behind Vale begins unfolding","shots":["alien cable fused to colony grid","Vale kneels at junction","Rook covers rear","close on dormant drone","single luminous eye activates"],"dialogue":"VALE: It is drawing power and sending it somewhere. VOSS: Can you trace it? VALE: Give me thirty seconds."},
+    {"index":8,"duration":60,"continuity_in":"drone activation","continuity_out":"facility lights ignite in sequence","shots":["drone unfolds","Voss shoves Vale clear","short energy firefight","Jax destroys drone","drone transmits pulse before dying"],"dialogue":"ROOK: Signal burst! VOSS: To what? KESTREL: Everything below you."},
+    {"index":9,"duration":60,"continuity_in":"activation pulse","continuity_out":"first Veyr silhouettes at far corridor","shots":["lights race down tunnels","machinery rotates awake","floor panels shift","squad backs toward cover","distant silhouettes appear"],"dialogue":"JAX: That answers who. VALE: Not what they are doing here."},
+    {"index":10,"duration":60,"continuity_in":"Veyr silhouettes","continuity_out":"squad retreating under organized enemy fire","shots":["Veyr squad emerges","close on original luminous masks","first coordinated volley","Voss signals fallback","Rook deploys sensor decoy"],"dialogue":"VOSS: Controlled withdrawal. No heroics. JAX: You always ruin my best ideas."},
+    {"index":11,"duration":60,"continuity_in":"fighting retreat","continuity_out":"maintenance blast door sealing behind squad","shots":["corridor combat wide","Jax suppresses drones","Vale triggers industrial arm as cover","Rook crosses fire lane","blast door closes on last energy bolt"],"dialogue":"VALE: Their shots are steering us. VOSS: Then stop going where they want."},
+    {"index":12,"duration":60,"continuity_in":"sealed door","continuity_out":"team emerging from zero-g shaft into reactor level","shots":["gravity fails","loose debris floats","mag boots engage","Rook traverses shaft exterior","team pulls across collapsing gantry"],"dialogue":"ROOK: Gravity is gone. KESTREL: Correction: gravity control was redirected. VALE: Toward the reactor."},
+    {"index":13,"duration":60,"continuity_in":"reactor approach","continuity_out":"gateway chamber door visible beyond smoke","shots":["heavy enemy push","Jax braces weapon","debris physics blast","Voss advances behind moving cover","smoke clears to giant sealed chamber"],"dialogue":"JAX: Door is yours. VOSS: Keep it that way."},
+    {"index":14,"duration":60,"continuity_in":"gateway chamber door","continuity_out":"full alien gateway revealed","shots":["door forced open","massive chamber wide","colony power cables converge","Vale discovers transport residue","gateway structure powers up"],"dialogue":"VALE: They did not kill the colonists. They moved them. ROOK: Moved them where? VALE: Somewhere this machine can reach."},
+    {"index":15,"duration":60,"continuity_in":"gateway powering","continuity_out":"Veyr commander stepping through partial portal","shots":["portal geometry forms","ghosted destination imagery","Voss records evidence","portal stabilizes briefly","armored commander silhouette enters"],"dialogue":"VOSS: This is not an occupation. It is reconnaissance. KESTREL: Commander, energy growth is exponential."},
+    {"index":16,"duration":60,"continuity_in":"commander arrival","continuity_out":"Voss and commander locked in close combat while team splits","shots":["commander lands","weapon clash","Voss orders sabotage","Vale and Rook sprint opposite directions","Jax holds central corridor"],"dialogue":"VOSS: Ninety seconds. Break the gate and get to extraction. JAX: And you? VOSS: I am buying ninety seconds."},
+    {"index":17,"duration":60,"continuity_in":"close combat","continuity_out":"gateway destabilizing as Rook climbs support spine","shots":["Voss duel with powered armor physics","Jax corridor defense","Vale overloads coupling","Rook climbs moving structure","portal flickers violently"],"dialogue":"VALE: First coupling down. ROOK: I need twelve meters. JAX: You have six. Make it heroic."},
+    {"index":18,"duration":60,"continuity_in":"Rook climbing gate","continuity_out":"dropship smashing through outer facility wall","shots":["Rook plants disruptor","Vale triggers overload","energy arcs","Voss escapes commander strike","Kestrel flies dropship through debris"],"dialogue":"ROOK: Charge set! VALE: Run. KESTREL: I have selected the shortest route. VOSS: That is a wall. KESTREL: It was."},
+    {"index":19,"duration":60,"continuity_in":"dropship breach","continuity_out":"dropship escaping exploding underground complex","shots":["ramp opens while moving","Jax boards backward firing","Vale pulls Rook aboard","Voss jumps last","facility collapses behind ship"],"dialogue":"JAX: Commander! VOSS: Go! KESTREL: Already doing so."},
+    {"index":20,"duration":60,"continuity_in":"escape","continuity_out":"cut to black after hundreds of signals","shots":["quiet orbit","damaged squad catches breath","planet through viewport","Kestrel detects new pings","camera pulls back as dark hemisphere fills with signals"],"dialogue":"ROOK: We stopped it. KESTREL: Commander... that was not the only signal. VOSS: How many? KESTREL: I am still counting."}
+  ]
+}
