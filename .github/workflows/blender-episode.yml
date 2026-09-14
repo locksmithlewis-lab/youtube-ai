@@ -7,6 +7,16 @@ on:
         description: Path to committed episode manifest
         required: true
         default: episodes/blackstar-s01e01/episode.json
+  push:
+    branches: [main]
+    paths:
+      - 'episodes/blackstar-s01e01/episode.json'
+      - 'scripts/blender_longform.py'
+      - 'scripts/blender_scene_driver.py'
+      - 'scripts/blender_segment_audio.py'
+      - 'scripts/assemble_blender_episode.py'
+      - 'scripts/register_blender_episode.py'
+      - '.github/workflows/blender-episode.yml'
 
 permissions:
   contents: read
@@ -37,7 +47,7 @@ jobs:
           ffmpeg -version | head -n 1
       - name: Stage episode manifest
         env:
-          EPISODE_MANIFEST: ${{ inputs.episode_manifest }}
+          EPISODE_MANIFEST: ${{ inputs.episode_manifest || 'episodes/blackstar-s01e01/episode.json' }}
         run: |
           test -f "$EPISODE_MANIFEST"
           mkdir -p .rolixa-episode
@@ -91,10 +101,10 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  assemble:
+  assemble-register-publish:
     needs: render-segment
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v5
       - name: Install media tools
@@ -107,8 +117,11 @@ jobs:
           pattern: blender-segment-*
           path: .rolixa-episode
           merge-multiple: true
-      - name: Confirm all twenty segments arrived
+      - name: Stage manifest and confirm all twenty segments
+        env:
+          EPISODE_MANIFEST: ${{ inputs.episode_manifest || 'episodes/blackstar-s01e01/episode.json' }}
         run: |
+          cp "$EPISODE_MANIFEST" .rolixa-episode/episode.json
           python - <<'PY'
           from pathlib import Path
           root=Path('.rolixa-episode')
@@ -127,7 +140,31 @@ jobs:
           ffprobe -v error -show_entries format=duration -show_entries stream=codec_type,width,height,codec_name -of json .rolixa-episode/episode-master.mp4
           ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0:s=x .rolixa-episode/episode-master.mp4 | grep -q '^1920x1080$'
           ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of csv=p=0 .rolixa-episode/episode-master.mp4 | grep -q .
-      - name: Upload finished episode
+      - name: Register master in production and run actual QC
+        env:
+          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ROLIXA_EPISODE_DIR: .rolixa-episode
+          PYTHONPATH: scripts
+        run: python scripts/register_blender_episode.py
+      - name: Advance only if existing quality gates pass
+        env:
+          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PYTHONPATH: scripts
+        run: python scripts/auto_quality.py
+      - name: Attempt normal publish drain
+        env:
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          test -n "$SERVICE_KEY"
+          RESPONSE=$(curl --fail-with-body --retry 2 --max-time 840 \
+            -X POST 'https://riloxa-bey56lewis-4041.vercel.app/api/auto-publish-ready' \
+            -H "Authorization: Bearer $SERVICE_KEY" \
+            -H 'Content-Type: application/json' \
+            --data '{}')
+          echo "$RESPONSE"
+      - name: Upload finished episode artifact
         uses: actions/upload-artifact@v4
         with:
           name: blackstar-s01e01-master
