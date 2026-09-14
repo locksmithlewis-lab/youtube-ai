@@ -42,7 +42,8 @@ jobs:
           esac
       - name: Install renderer
         run: |
-          if ! command -v ffmpeg >/dev/null 2>&1; then sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core; fi
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v blender >/dev/null 2>&1; then sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core blender; fi
+          blender --version
           python - <<'PY' || python -m pip install --quiet piper-tts==1.6.0
           import piper
           PY
