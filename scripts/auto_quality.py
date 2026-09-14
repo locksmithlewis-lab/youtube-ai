@@ -1,4 +1,4 @@
-import json, os, urllib.parse, urllib.request
+import json, os, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timezone
 SUPABASE_URL=os.environ.get('SUPABASE_URL','').rstrip('/');SERVICE_KEY=os.environ.get('SUPABASE_SERVICE_ROLE_KEY','')
 if not SUPABASE_URL or not SERVICE_KEY:raise SystemExit('Supabase secrets required.')
@@ -7,8 +7,12 @@ def req(method,path,data=None,prefer=None):
     h=dict(HEADERS)
     if prefer:h['Prefer']=prefer
     r=urllib.request.Request(SUPABASE_URL+path,data=None if data is None else json.dumps(data).encode(),headers=h,method=method)
-    with urllib.request.urlopen(r,timeout=60) as res:
-        raw=res.read();return json.loads(raw.decode()) if raw else None
+    try:
+        with urllib.request.urlopen(r,timeout=60) as res:
+            raw=res.read();return json.loads(raw.decode()) if raw else None
+    except urllib.error.HTTPError as exc:
+        body=exc.read().decode('utf-8','replace')[:1200]
+        raise RuntimeError(f'HTTP {exc.code}: {body}') from exc
 def patch(table,row_id,payload):return req('PATCH',f'/rest/v1/{table}?id=eq.{row_id}',payload,'return=minimal')
 def is_factual(p):return str(p.get('style') or '').lower() in ('documentary','news','educational','explainer') or str(p.get('format') or '').lower()=='explainer'
 def passed_step(pid,name):
@@ -22,9 +26,11 @@ def series_order_ready(pid):
     membership=req('GET',f'/rest/v1/series_episodes?video_project_id=eq.{pid}&select=series_id,episode_number&limit=1') or []
     if not membership:return True,None
     current=membership[0];series_id=current['series_id'];episode_number=int(current['episode_number'])
-    priors=req('GET',f'/rest/v1/series_episodes?series_id=eq.{series_id}&episode_number=lt.{episode_number}&select=episode_number,video_project_id&order=episode_number.asc') or []
+    priors=req('GET',f'/rest/v1/series_episodes?series_id=eq.{series_id}&episode_number=lt.{episode_number}&video_project_id=not.is.null&select=episode_number,video_project_id&order=episode_number.asc') or []
     for prior in priors:
-        rows=req('GET',f"/rest/v1/video_projects?id=eq.{prior.get('video_project_id')}&select=status,title&limit=1") or []
+        project_id=prior.get('video_project_id')
+        if not project_id:continue
+        rows=req('GET',f"/rest/v1/video_projects?id=eq.{project_id}&select=status,title&limit=1") or []
         if not rows or rows[0].get('status')!='posted':
             return False,f"Series continuity hold: Chapter {prior.get('episode_number')} must publish before Chapter {episode_number}."
     return True,None
