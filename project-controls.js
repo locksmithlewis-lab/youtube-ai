@@ -67,6 +67,16 @@ async function openStatusDrawer(status){
 function jumpToProject(id){
  document.querySelector('[data-close-status-drawer]')?.click();document.querySelector('.tab[data-view="videos"]')?.click();setTimeout(()=>document.querySelector(`[data-open-project="${CSS.escape(id)}"]`)?.click(),100);
 }
+function installBlackstarLauncher(){
+ const tabs=document.querySelector('.sidebar .tabs');
+ if(tabs&&!tabs.querySelector('[data-blackstar-launch]')){
+  const a=document.createElement('a');a.href='./blackstar.html';a.className='tab';a.dataset.blackstarLaunch='true';a.innerHTML='<span class="tab-icon">★</span><span>BLACKSTAR</span>';tabs.appendChild(a);
+ }
+ const hero=document.querySelector('#home .hero-actions');
+ if(hero&&!hero.querySelector('[data-blackstar-launch]')){
+  const a=document.createElement('a');a.href='./blackstar.html';a.className='ghost';a.dataset.blackstarLaunch='true';a.textContent='★ BLACKSTAR Command';hero.appendChild(a);
+ }
+}
 document.addEventListener('click',event=>{
  if(event.target.closest('[data-cancel-render]'))sendAction('cancel');
  if(event.target.closest('[data-remove-project]'))sendAction('delete');
@@ -79,4 +89,4 @@ document.addEventListener('click',event=>{
  setTimeout(addControls,50);
 });
 document.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){const metric=event.target.closest?.('[data-status-drilldown]');if(metric){event.preventDefault();openStatusDrawer(metric.dataset.statusDrilldown);}}if(event.key==='Escape'){const drawer=document.getElementById('statusDrilldownDrawer');if(drawer)drawer.hidden=true;}});
-new MutationObserver(()=>{addControls();addPageControls();installMetricDrilldowns();}).observe(document.body,{childList:true,subtree:true});addControls();addPageControls();installMetricDrilldowns();
+new MutationObserver(()=>{addControls();addPageControls();installMetricDrilldowns();installBlackstarLauncher();}).observe(document.body,{childList:true,subtree:true});addControls();addPageControls();installMetricDrilldowns();installBlackstarLauncher();
