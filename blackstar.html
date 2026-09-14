@@ -7,22 +7,30 @@
   <title>BLACKSTAR · Rolixa</title>
   <meta name="description" content="BLACKSTAR series command center for story, characters, lore, production, audio and merchandise." />
   <link rel="stylesheet" href="./styles.css" />
+  <style>
+    body{padding-bottom:78px}
+    .blackstar-bottom-nav{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:1200;display:flex;align-items:center;gap:8px;padding:7px;border:1px solid rgba(255,255,255,.12);border-radius:18px;background:rgba(7,9,15,.94);box-shadow:0 16px 50px rgba(0,0,0,.45);backdrop-filter:blur(16px)}
+    .blackstar-bottom-nav a{min-width:118px;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 16px;border-radius:12px;color:#aab6c6;text-decoration:none;font-weight:700}
+    .blackstar-bottom-nav a.active{color:#fff;background:linear-gradient(135deg,rgba(37,99,235,.34),rgba(34,211,238,.18));border:1px solid rgba(90,223,255,.26)}
+    .blackstar-bottom-nav .nav-star{color:#7dd3fc}
+    @media(max-width:800px){.sidebar{display:none!important}.workspace{margin-left:0!important;width:100%!important}.blackstar-bottom-nav{left:12px;right:12px;bottom:10px;transform:none;justify-content:stretch}.blackstar-bottom-nav a{flex:1;min-width:0}.topbar .ghost{display:none}}
+  </style>
 </head>
 <body>
 <div class="app-shell">
   <aside class="sidebar">
     <div class="brand-block"><div class="brand-mark">★</div><div><div class="eyebrow">ROLIXA ORIGINAL</div><div class="brand-name">BLACKSTAR</div></div></div>
-    <nav class="tabs">
-      <a class="tab active" href="./blackstar.html"><span class="tab-icon">★</span><span>BLACKSTAR</span></a>
-      <a class="tab" href="./"><span class="tab-icon">⌂</span><span>Rolixa Home</span></a>
-    </nav>
     <div class="sidebar-foot"><div class="system-card"><span class="status-dot"></span><div><strong>Canon system</strong><span>Show bible locked</span></div></div></div>
   </aside>
   <div class="workspace">
-    <header class="topbar"><div><div class="eyebrow">SERIES COMMAND CENTER</div><h1>Story. Production. Merch.</h1></div><a class="ghost compact" href="./">← Rolixa</a></header>
+    <header class="topbar"><div><div class="eyebrow">SERIES COMMAND CENTER</div><h1>Story. Production. Merch.</h1></div></header>
     <main><section id="blackstar" class="view active-view"><div id="blackstarRoot"><div class="panel">Loading BLACKSTAR…</div></div></section></main>
   </div>
 </div>
+<nav class="blackstar-bottom-nav" aria-label="Primary navigation">
+  <a href="./"><span>⌂</span><span>Home</span></a>
+  <a class="active" href="./blackstar.html" aria-current="page"><span class="nav-star">★</span><span>BLACKSTAR</span></a>
+</nav>
 <script type="module" src="./blackstar-ui.js"></script>
 <script type="module" src="./blackstar-printify.js"></script>
 </body>
