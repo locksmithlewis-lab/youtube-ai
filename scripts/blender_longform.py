@@ -58,15 +58,17 @@ def extract_portrait_references():
 
     payload = re.sub(r"\s+", "", m.group(1))
     # Preserve the approved sprite exactly. Recover only narrow JS-editing damage:
-    # one stray base64 character, or at most three decoded bytes after a complete
-    # JPEG EOI marker. Strict base64, SOI/EOI and ffmpeg crop decoding still gate
-    # every render, so truncated/corrupt portrait data remains blocked.
+    # one stray base64 character, or a small byte tail after a complete JPEG EOI
+    # marker. The EOI must be within the final 2% and at most 4096 bytes from EOF.
+    # Strict base64, SOI/EOI and nine successful ffmpeg crops still gate rendering,
+    # so truncated/corrupt portrait data remains blocked rather than synthesized.
     candidates = [payload]
     if len(payload.rstrip("=")) % 4 == 1:
         candidates.append(payload.rstrip("=")[:-1])
 
     raw = None
     last_error = None
+    diagnostic = ""
     for candidate in candidates:
         padded = candidate + "=" * (-len(candidate) % 4)
         try:
@@ -75,18 +77,26 @@ def extract_portrait_references():
             last_error = exc
             continue
         if len(decoded) < 1024 or not decoded.startswith(b"\xff\xd8"):
+            diagnostic = f" decoded_bytes={len(decoded)} soi={decoded[:2].hex() if decoded else 'none'}"
             continue
         clean = decoded.rstrip(b"\x00")
         if clean.endswith(b"\xff\xd9"):
             raw = clean
             break
         eoi = clean.rfind(b"\xff\xd9")
-        if eoi >= 1022 and len(clean) - (eoi + 2) <= 3:
+        trailing = len(clean) - (eoi + 2) if eoi >= 0 else -1
+        diagnostic = f" decoded_bytes={len(clean)} eoi={eoi} trailing={trailing}"
+        if (
+            eoi >= 1022
+            and trailing >= 0
+            and trailing <= 4096
+            and eoi + 2 >= int(len(clean) * 0.98)
+        ):
             raw = clean[:eoi + 2]
-            print(f"recovered approved portrait sprite by trimming {len(clean) - (eoi + 2)} trailing byte(s)")
+            print(f"recovered approved portrait sprite by trimming {trailing} trailing byte(s)")
             break
     if raw is None:
-        detail = f": {last_error}" if last_error else ""
+        detail = f": {last_error}" if last_error else diagnostic
         raise RuntimeError(f"approved portrait sprite is invalid or incomplete JPEG{detail}")
 
     portrait_dir = ROOT / "portraits"
