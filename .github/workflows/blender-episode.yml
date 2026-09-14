@@ -1,0 +1,123 @@
+name: Render Blender episode
+
+on:
+  workflow_dispatch:
+    inputs:
+      episode_manifest:
+        description: Path to committed episode manifest
+        required: true
+        default: episodes/blackstar-s01e01/episode.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blender-episode-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  render-segment:
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        worker: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Blender and media tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq blender ffmpeg fonts-dejavu-core
+          blender --version
+          ffmpeg -version | head -n 1
+      - name: Stage episode manifest
+        env:
+          EPISODE_MANIFEST: ${{ inputs.episode_manifest }}
+        run: |
+          test -f "$EPISODE_MANIFEST"
+          mkdir -p .rolixa-episode
+          cp "$EPISODE_MANIFEST" .rolixa-episode/episode.json
+          python - <<'PY'
+          import json
+          p=json.load(open('.rolixa-episode/episode.json',encoding='utf-8'))
+          assert len(p.get('segments',[])) == 20, 'episode requires exactly 20 segments'
+          for i,s in enumerate(p['segments'],1):
+              assert s.get('index') == i
+              assert 50 <= float(s.get('duration',0)) <= 70
+              assert s.get('shots')
+              assert s.get('continuity_in') and s.get('continuity_out')
+          print('manifest validated')
+          PY
+      - name: Render continuity-locked segment
+        env:
+          ROLIXA_WORKER: ${{ matrix.worker }}
+          ROLIXA_LONGFORM_SEGMENTS: '20'
+          ROLIXA_LONGFORM_FPS: '24'
+          ROLIXA_EPISODE_DIR: .rolixa-episode
+        run: python scripts/blender_longform.py
+      - name: Verify segment
+        env:
+          WORKER: ${{ matrix.worker }}
+        run: |
+          F=$(printf '.rolixa-episode/segment-%02d.mp4' "$WORKER")
+          test -s "$F"
+          D=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$F")
+          python - "$D" <<'PY'
+          import sys
+          d=float(sys.argv[1])
+          assert 50 <= d <= 70, f'bad segment duration {d}'
+          print(f'segment duration {d:.2f}s')
+          PY
+      - name: Upload segment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: blender-segment-${{ matrix.worker }}
+          path: |
+            .rolixa-episode/segment-*.mp4
+            .rolixa-episode/segment-*.blend
+          if-no-files-found: error
+          retention-days: 7
+
+  assemble:
+    needs: render-segment
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install media tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Download all rendered segments
+        uses: actions/download-artifact@v5
+        with:
+          pattern: blender-segment-*
+          path: .rolixa-episode
+          merge-multiple: true
+      - name: Confirm all twenty segments arrived
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          root=Path('.rolixa-episode')
+          missing=[str(root/f'segment-{i:02}.mp4') for i in range(1,21) if not (root/f'segment-{i:02}.mp4').exists()]
+          if missing: raise SystemExit('missing artifacts: '+', '.join(missing))
+          print('all 20 segment artifacts present')
+          PY
+      - name: Assemble master episode
+        env:
+          ROLIXA_EPISODE_DIR: .rolixa-episode
+          ROLIXA_LONGFORM_SEGMENTS: '20'
+        run: python scripts/assemble_blender_episode.py
+      - name: Validate master
+        run: |
+          test -s .rolixa-episode/episode-master.mp4
+          ffprobe -v error -show_entries format=duration,width,height -of json .rolixa-episode/episode-master.mp4
+      - name: Upload finished episode
+        uses: actions/upload-artifact@v4
+        with:
+          name: blackstar-s01e01-master
+          path: .rolixa-episode/episode-master.mp4
+          if-no-files-found: error
+          retention-days: 14
