@@ -10,6 +10,8 @@ on:
       - 'scripts/series_controller.py'
       - 'scripts/production_guard.py'
       - 'scripts/production_watchdog.py'
+      - 'scripts/shortform_writer.py'
+      - 'scripts/sitecustomize.py'
       - '.github/workflows/auto-quality.yml'
   schedule:
     - cron: '*/5 * * * *'
