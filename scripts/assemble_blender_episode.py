@@ -44,9 +44,9 @@ start = max(0.0, dur - 6.0)
 font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 text = 'LIKE + SUBSCRIBE  •  BLACKSTAR WILL RETURN'
 filter_expr = (
-    f"drawbox=x=0:y=h-190:w=w:h=190:color=black@0.58:t=fill:enable='gte(t,{start:.3f})',"
+    f"drawbox=x=0:y=ih-190:w=iw:h=190:color=black@0.58:t=fill:enable='gte(t,{start:.3f})',"
     f"drawtext=fontfile={font}:text='{text}':fontcolor=white:fontsize=48:"
-    f"x=(w-text_w)/2:y=h-118:enable='gte(t,{start:.3f})'"
+    f"x=(iw-text_w)/2:y=ih-118:enable='gte(t,{start:.3f})'"
 )
 subprocess.run([
     'ffmpeg', '-y', '-loglevel', 'error', '-i', str(joined),
