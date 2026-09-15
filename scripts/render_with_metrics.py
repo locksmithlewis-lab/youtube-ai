@@ -10,6 +10,7 @@ from pathlib import Path
 from production_guard import creative_preflight, final_video_qc, publication_priority
 from longform_writer import needs_script as long_needs_script, write as write_longform
 from shortform_writer import needs_script as short_needs_script, write as write_shortform
+from engagement_cta import ensure_cta
 
 URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
@@ -205,4 +206,6 @@ render=subprocess.run(['python','scripts/render_video.py'],capture_output=True,t
 if render.returncode: raise SystemExit(render.returncode)
 matches=re.findall(r'Rendered\s+([^/\s]+/([^/\s]+)/([^/:\s]+)\.mp4):',text)
 if not matches: raise SystemExit(0)
-obj,project_id,job_id=matches[-1]; post_render_qc(project_id,job_id,obj)
+obj,project_id,job_id=matches[-1]
+ensure_cta(obj, project_id, job_id)
+post_render_qc(project_id,job_id,obj)
