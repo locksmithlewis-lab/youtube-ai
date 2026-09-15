@@ -13,6 +13,7 @@ import urllib.request
 from pathlib import Path
 
 from production_guard import creative_preflight, final_video_qc, publication_priority
+from storage_upload import upload_file
 
 URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
@@ -42,11 +43,7 @@ def req(method, path, data=None, prefer=None):
 
 
 def upload(obj):
-    url = URL + '/storage/v1/object/video-outputs/' + urllib.parse.quote(obj, safe='/')
-    h = {'apikey': KEY, 'Authorization': f'Bearer {KEY}', 'Content-Type': 'video/mp4', 'x-upsert': 'true'}
-    with MASTER.open('rb') as f:
-        r = urllib.request.Request(url, data=f.read(), headers=h, method='PUT')
-        urllib.request.urlopen(r, timeout=1800).read()
+    upload_file(MASTER, URL, KEY, 'video-outputs', obj, mime='video/mp4', upsert=True)
 
 
 def set_step(project, name, status, detail):
