@@ -1,0 +1,39 @@
+name: Storage retention and production status
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 */6 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/storage_retention.py'
+      - 'scripts/production_status.py'
+      - '.github/workflows/storage-retention.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rolixa-storage-retention
+  cancel-in-progress: false
+
+jobs:
+  retention:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Inspect production state
+        env:
+          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python3 scripts/production_status.py
+      - name: Delete only non-essential published MP4 archives
+        env:
+          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ROLIXA_ARCHIVE_AFTER_DAYS: '7'
+          ROLIXA_KEEP_VIEWS: '100'
+          ROLIXA_STORAGE_BUCKET: video-outputs
+        run: python3 scripts/storage_retention.py
