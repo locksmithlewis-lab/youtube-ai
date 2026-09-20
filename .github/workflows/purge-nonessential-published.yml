@@ -1,0 +1,86 @@
+name: Purge non-essential published video archives
+
+on:
+  push:
+    paths:
+      - .github/workflows/purge-nonessential-published.yml
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete low-view published MP4 archives
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${SUPABASE_URL}" || -z "${SUPABASE_SERVICE_ROLE_KEY}" ]]; then
+            echo "Required Supabase secrets are not configured."
+            exit 1
+          fi
+
+          # Safety rule:
+          # - video-outputs only
+          # - published projects only
+          # - published more than 7 days ago
+          # - fewer than 100 latest recorded YouTube views
+          # - keeps the six older published videos with >=100 views
+          # - does not touch YouTube uploads or video_projects rows
+          objects=(
+            "b04cae45-a165-4d66-b88e-e8f043771370/0169b390-ec0e-4a6f-bf06-9593a29cbb63/1b1ded20-ca2d-4b1f-88d9-06d4ca1e4a07.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/f1c422cf-532c-4005-95ba-a35bec4cd22e/998e3fa4-a7c8-4b82-8311-109e7c32884d.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/2439529a-7a27-4652-9938-a2be6bea08b7/306357ac-7b2f-4092-a339-2dd33fdbe8f0.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/05ca05bf-36bf-4841-b859-d965ac74a338/810a0986-c23f-49a8-85ea-55d0a270efd6.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/c56cf018-51de-4e54-ac94-1ddaccb994fc/2a168f39-3797-4eda-9410-3dfeadead423.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/3e2818e8-91d7-44b7-9e3b-ab4621a622c6/9e7e669f-6b7c-4146-a988-91db8eedfd30.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/403be8aa-1396-431f-bee5-1dad0301cdd9/49ce929e-06b4-4a5c-86ab-58b1ddac1fe8.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/3b2b4493-ce52-4976-a80f-1fedfffe4440/0abaf2e7-5282-47d7-ae92-c5e1a584956e.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/076692ef-4376-4925-9722-fcdd01d6289f/275d8ed4-5ba9-44ec-bc05-638a24d39578.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/b3f1a18a-5820-4523-a202-810a6f5512c5/5ef4c95e-a123-480d-a6b8-2ee91b63e8e2.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/4f3dad2c-ed1e-4917-9b95-46e2bf8f9b2a/91b273f2-f238-4bb7-94a4-b4c7159b8665.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/0ed90eb3-3a74-4a34-8077-45168227a978/665721df-62c9-4ea8-a699-354a2b7984bc.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/4ec551ef-a065-45bf-8fb7-75a0ab7e1333/34c08f87-0fba-4197-824e-4a29092fdaea.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/b01171aa-98b9-4a0d-934c-2d25cb0f95cf/428b9357-edfd-4094-bfbf-27a419f6bf39.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/c965d047-38bd-4aee-b9f8-278155333096/4ad254eb-fbd1-4103-984e-35e3e8a550e9.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/5ef82298-6650-4442-b269-4dc0218c4b7f/62e58cc0-552c-4899-a36d-518e0a5a29fa.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/66fb6770-cf80-41b3-8d60-029ee2304545/42570e7f-acf0-414e-b060-00b7c38e0862.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/7f936e70-e4a9-4d52-a0a9-e2d08860d5f2/d1786da9-ff7e-46c9-87a2-9edaf7d31af8.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/b236ffed-00aa-4282-8c6f-c19f733bf5d8/9eff156b-34f0-4dac-86a9-ff021d028b07.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/7b4c5ca7-6c64-4bb8-9078-4a7d03f41ba8/c8867073-2ce2-4331-8bd2-e1a0809eb60c.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/bb9e3960-a24c-4460-b9ad-7e12438fc8eb/b96ec26c-f903-4528-afbb-071c4b8b20e3.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/587e4483-daa3-452e-9096-7da18540a5f3/16e90a1e-bf47-4607-82c7-8a637fca71c5.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/75724a8e-97b5-4dc7-9398-51a4c63dc2d4/3710db03-a3e9-43cc-9620-46ee4469b18e.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/3c7b0fc3-f612-49f1-8956-28a54f276c30/7e3316fa-c157-4bee-a2b5-2bdc24791441.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/a58c677b-00f0-46f4-becd-a76bd7dca082/aeaa1b4a-5b58-4a60-bd3f-7d53eeddcb98.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/3fe88d80-0da1-4b37-9222-bc7533fcaac5/0922ea1f-7c65-40a7-8ab9-5e36e25bd1fb.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/d31771e4-dc5b-4d67-97c8-dde023dc2d24/e133c123-4e02-4fab-b616-b6aeb6722645.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/90e6d9cb-ed8c-4948-b347-712a6d3077df/029414e8-023b-4ec1-baed-d24c93361c99.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/fb0f3a7c-f676-4408-a9aa-b496532df9a7/8fde6389-3b6f-459d-804f-dbbaae0a0a63.mp4"
+            "b04cae45-a165-4d66-b88e-e8f043771370/45fb0cf2-581c-4457-b02c-70e56f1d50ac/cf809521-ea12-4c37-a937-50d68de43d04.mp4"
+          )
+
+          printf 'Attempting Storage API deletion of %d archived MP4s...\n' "${#objects[@]}"
+
+          body=$(python3 -c 'import json,sys; print(json.dumps({"prefixes":sys.argv[1:]}))' "${objects[@]}")
+
+          response_file=$(mktemp)
+          http_code=$(curl -sS -o "${response_file}" -w '%{http_code}' \
+            -X DELETE "${SUPABASE_URL}/storage/v1/object/video-outputs" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --data "${body}")
+
+          echo "Storage API HTTP status: ${http_code}"
+          cat "${response_file}"
+
+          if [[ "${http_code}" -lt 200 || "${http_code}" -ge 300 ]]; then
+            echo "Deletion did not complete; no database rows were changed."
+            exit 1
+          fi
+
+          echo
+          echo "Deletion request completed successfully."
