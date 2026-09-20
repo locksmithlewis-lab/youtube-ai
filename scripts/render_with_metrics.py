@@ -3,6 +3,8 @@ import os
 import re
 import subprocess
 import tempfile
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -21,10 +23,21 @@ def req(method, path, data=None, prefer=None):
     headers = dict(H)
     if prefer:
         headers['Prefer'] = prefer
-    request = urllib.request.Request(URL + path, data=None if data is None else json.dumps(data).encode(), headers=headers, method=method)
-    with urllib.request.urlopen(request, timeout=120) as response:
-        raw = response.read()
-        return json.loads(raw.decode()) if raw else None
+    payload = None if data is None else json.dumps(data).encode()
+    # Bounded retry only for connection failures that happen before an HTTP response.
+    # HTTP errors (including quota/authorization failures) are never blindly retried.
+    for attempt in range(3):
+        request = urllib.request.Request(URL + path, data=payload, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                raw = response.read()
+                return json.loads(raw.decode()) if raw else None
+        except urllib.error.HTTPError:
+            raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if attempt == 2:
+                raise
+            time.sleep(1.5 * (2 ** attempt))
 
 
 def patch(table, item_id, data):
