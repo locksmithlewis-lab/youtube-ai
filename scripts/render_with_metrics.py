@@ -201,7 +201,10 @@ def post_render_qc(project_id, job_id, obj):
         raise
 
 
-preflight_queue()
+# Only worker 1 performs queue preflight; all other matrix workers render distinct claimed jobs.
+# This avoids 12 identical queue scans/writes per render cycle and reduces Supabase egress pressure.
+if os.environ.get('ROLIXA_WORKER', '1') == '1':
+    preflight_queue()
 render=subprocess.run(['python','scripts/render_video.py'],capture_output=True,text=True); text=(render.stdout or '')+(render.stderr or ''); print(text,end='')
 if render.returncode: raise SystemExit(render.returncode)
 matches=re.findall(r'Rendered\s+([^/\s]+/([^/\s]+)/([^/:\s]+)\.mp4):',text)
