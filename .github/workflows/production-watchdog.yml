@@ -1,0 +1,36 @@
+name: Production watchdog recovery
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/production_watchdog.py'
+      - '.github/workflows/production-watchdog.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rolixa-production-watchdog
+  cancel-in-progress: false
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - name: Diagnose and recover
+        env:
+          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ROLIXA_MAX_IDLE_HOURS: '24'
+          ROLIXA_MIN_READY_BACKLOG: '3'
+          ROLIXA_STUCK_GENERATING_HOURS: '1.5'
+          ROLIXA_MAX_STUCK_REQUEUES: '8'
+          ROLIXA_WATCHDOG_FAIL_ON_STALL: '0'
+          PYTHONPATH: scripts
+        run: python3 scripts/production_watchdog.py
