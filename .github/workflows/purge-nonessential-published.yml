@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - .github/workflows/purge-nonessential-published.yml
+  workflow_dispatch:
 
 jobs:
   purge:
@@ -22,13 +23,6 @@ jobs:
             exit 1
           fi
 
-          # Safety rule:
-          # - video-outputs only
-          # - published projects only
-          # - published more than 7 days ago
-          # - fewer than 100 latest recorded YouTube views
-          # - keeps the six older published videos with >=100 views
-          # - does not touch YouTube uploads or video_projects rows
           objects=(
             "b04cae45-a165-4d66-b88e-e8f043771370/0169b390-ec0e-4a6f-bf06-9593a29cbb63/1b1ded20-ca2d-4b1f-88d9-06d4ca1e4a07.mp4"
             "b04cae45-a165-4d66-b88e-e8f043771370/f1c422cf-532c-4005-95ba-a35bec4cd22e/998e3fa4-a7c8-4b82-8311-109e7c32884d.mp4"
@@ -63,9 +57,7 @@ jobs:
           )
 
           printf 'Attempting Storage API deletion of %d archived MP4s...\n' "${#objects[@]}"
-
           body=$(python3 -c 'import json,sys; print(json.dumps({"prefixes":sys.argv[1:]}))' "${objects[@]}")
-
           response_file=$(mktemp)
           http_code=$(curl -sS -o "${response_file}" -w '%{http_code}' \
             -X DELETE "${SUPABASE_URL}/storage/v1/object/video-outputs" \
