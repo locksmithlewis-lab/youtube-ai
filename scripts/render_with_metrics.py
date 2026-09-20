@@ -183,7 +183,13 @@ def post_render_qc(project_id, job_id, obj):
     step(project,'final_video_qc','running','Inspecting the actual finished MP4 for semantic visual match, black frames, freezes, silence, duration and format.')
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
-            raw=Path(temp_dir)/'raw.mp4'; master=Path(temp_dir)/'master.mp4'; download_output(obj,raw)
+            raw=Path(temp_dir)/'raw.mp4'; master=Path(temp_dir)/'master.mp4'
+            # Prefer the renderer's local output. It is still uploaded to Supabase for durable storage/publication, but QC no longer downloads the same MP4 back from Storage.
+            local_output=Path('render-work') / str(job_id) / 'output.mp4'
+            if local_output.exists() and local_output.stat().st_size > 0:
+                raw.write_bytes(local_output.read_bytes())
+            else:
+                download_output(obj,raw)
             longform=int(project.get('target_duration_seconds') or 0)>120 or str(project.get('format') or '').lower() in ('long','longform','full','youtube','youtube video','full video','long form','long-form')
             add_sound_design(raw,master,longform); step(project,'sound_design','passed','Added a subtle locally generated ambience bed, narration-safe compression and final loudness mastering.')
             result=final_video_qc(master,project,assets); report(project,job,'final_video_qc',result)
