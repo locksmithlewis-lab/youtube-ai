@@ -30,8 +30,38 @@ jobs:
     outputs:
       available: ${{ steps.backend.outputs.available }}
     steps:
+      - name: Check Supabase backend availability
+        id: backend
+        env:
+          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set +e
+          code=$(curl -sS -o /tmp/supabase-check.json -w "%{http_code}" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            "$SUPABASE_URL/rest/v1/video_projects?select=id&limit=1")
+          if [ "$code" = "200" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Supabase REST is available; rendering may proceed."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Supabase unavailable/restricted (HTTP $code). Render fleet skipped."
+          fi
+
+  render:
+    needs: preflight
+    if: needs.preflight.outputs.available == 'true' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        worker: [1,2,3,4,5,6,7,8,9,10,11,12]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
       - name: Select voice
-        if: steps.backend.outputs.available == 'true'
         run: |
           case $(( ${{ matrix.worker }} % 3 )) in
             1) echo 'PIPER_VOICE=en_US-lessac-medium' >> "$GITHUB_ENV" ;;
@@ -39,7 +69,6 @@ jobs:
             0) echo 'PIPER_VOICE=en_US-amy-medium' >> "$GITHUB_ENV" ;;
           esac
       - name: Install renderer
-        if: steps.backend.outputs.available == 'true'
         run: |
           if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v blender >/dev/null 2>&1; then sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core blender; fi
           blender --version
@@ -47,11 +76,9 @@ jobs:
           import piper
           PY
       - name: Render with quality gates
-        if: steps.backend.outputs.available == 'true'
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          # Free-tier mode: paid AI/video APIs are intentionally disabled.
           GENERATIVE_VIDEO_ENABLED: '0'
           GENERATIVE_VIDEO_PERCENT: '0'
           PYTHONPATH: scripts
