@@ -11,6 +11,7 @@ from pathlib import Path
 
 from media_integrity import is_healthy
 from visual_sources import plan_scene, choose, local_graphic_asset
+from storage_upload import upload_file
 
 SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
@@ -475,23 +476,17 @@ try:
         )
 
     obj = f"{job['user_id']}/{job['project_id']}/{job['id']}.mp4"
-    url = SUPABASE_URL + '/storage/v1/object/video-outputs/' + urllib.parse.quote(obj, safe='/')
-    with out.open('rb') as handle:
-        upload_request = urllib.request.Request(
-            url, data=handle.read(),
-            headers={'apikey': SERVICE_KEY, 'Authorization': f'Bearer {SERVICE_KEY}', 'Content-Type': 'video/mp4', 'x-upsert': 'true'},
-            method='POST',
-        )
-        urllib.request.urlopen(upload_request, timeout=600 if longform else 240).read()
+    stored = upload_file(out, SUPABASE_URL, SERVICE_KEY, 'video-outputs', obj, mime='video/mp4', upsert=True)
+    media_url = stored.get('url') or obj
 
     elapsed = max(.1, time.monotonic() - started)
     patch('render_jobs', job['id'], {
-        'status': 'completed', 'engine': ENGINE, 'output_url': obj, 'error': None,
+        'status': 'completed', 'engine': ENGINE, 'output_url': media_url, 'error': None,
         'completed_at': 'now()', 'actual_render_seconds': elapsed,
         'media_duration_seconds': final_dur, 'updated_at': 'now()',
     })
     patch('video_projects', project['id'], {
-        'output_url': obj, 'voice': VOICE_MODEL, 'status': 'generating',
+        'output_url': media_url, 'voice': VOICE_MODEL, 'status': 'generating',
         'failure_reason': None, 'updated_at': 'now()',
     })
     warning_text = (' ' + '; '.join(warnings)) if warnings else ''
