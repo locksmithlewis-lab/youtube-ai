@@ -33,7 +33,7 @@ jobs:
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          ROLIXA_ARCHIVE_AFTER_DAYS: '7'
+          ROLIXA_ARCHIVE_AFTER_DAYS: '2'
           ROLIXA_KEEP_VIEWS: '100'
           ROLIXA_STORAGE_BUCKET: video-outputs
         run: python3 scripts/storage_retention.py
