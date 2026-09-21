@@ -13,6 +13,12 @@ from production_guard import creative_preflight, final_video_qc, publication_pri
 from longform_writer import needs_script as long_needs_script, write as write_longform
 from shortform_writer import needs_script as short_needs_script, write as write_shortform
 from engagement_cta import ensure_cta
+from storage_upload import upload_file as backend_upload_file
+try:
+    from r2_storage import configured as r2_configured, download_file as r2_download_file
+except ImportError:
+    r2_configured = lambda: False
+    r2_download_file = None
 
 URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
@@ -134,6 +140,9 @@ def preflight_queue():
 
 
 def download_output(obj, path):
+    if r2_configured():
+        r2_download_file(obj, path)
+        return
     url = URL + '/storage/v1/object/video-outputs/' + urllib.parse.quote(obj, safe='/')
     request = urllib.request.Request(url, headers={'apikey': KEY, 'Authorization': f'Bearer {KEY}'})
     with urllib.request.urlopen(request, timeout=600) as response, open(path, 'wb') as handle:
@@ -145,23 +154,15 @@ def download_output(obj, path):
 
 
 def upload(path, bucket, obj, mime, replace=False):
-    """Upload a new object or explicitly replace an existing one.
-
-    The raw renderer creates video-outputs/{obj} first. Final QC then masters that
-    same object. Using POST for the second write can return 409 Resource Already
-    Exists even with x-upsert on some Storage paths, so mastered videos use PUT.
-    """
+    if bucket == 'video-outputs':
+        return backend_upload_file(path, URL, KEY, bucket, obj, mime=mime, upsert=True)
     url = URL + f'/storage/v1/object/{bucket}/' + urllib.parse.quote(obj, safe='/')
-    headers = {
-        'apikey': KEY,
-        'Authorization': f'Bearer {KEY}',
-        'Content-Type': mime,
-        'x-upsert': 'true',
-    }
+    headers = {'apikey': KEY, 'Authorization': f'Bearer {KEY}', 'Content-Type': mime, 'x-upsert': 'true'}
     method = 'PUT' if replace else 'POST'
     with open(path, 'rb') as handle:
         request = urllib.request.Request(url, data=handle.read(), headers=headers, method=method)
         urllib.request.urlopen(request, timeout=600).read()
+    return {'url': obj}
 
 
 def media_duration(path):
@@ -208,10 +209,10 @@ def post_render_qc(project_id, job_id, obj):
             result=final_video_qc(master,project,assets); report(project,job,'final_video_qc',result)
             if not result['passed']:
                 reason='Final video QC failed: '+'; '.join(result['reasons']); patch('video_projects',project['id'],{'quality_score':result['score'],'status':'failed','output_url':None,'failure_reason':reason,'updated_at':'now()'}); patch('render_jobs',job['id'],{'status':'failed','error':reason,'updated_at':'now()'}); step(project,'final_video_qc','failed',f"Finished-video score {result['score']}/100. "+'; '.join(result['reasons'])); raise RuntimeError(reason)
-            upload(master,'video-outputs',obj,'video/mp4',replace=True); thumb_obj=None
+            stored=upload(master,'video-outputs',obj,'video/mp4',replace=True); media_url=stored.get('url') or obj; thumb_obj=None
             if longform:
                 thumb=Path(temp_dir)/'thumbnail.jpg'; make_thumbnail(master,project.get('title'),thumb); thumb_obj=f"{project['user_id']}/{project['id']}/{job_id}.jpg"; upload(thumb,'video-thumbnails',thumb_obj,'image/jpeg'); step(project,'thumbnail','passed','Generated a custom 16:9 thumbnail from the finished video with concise title treatment.')
-            creative=float(project.get('creative_score') or 0); priority=publication_priority(project,creative,result['score']); payload={'quality_score':result['score'],'publication_priority':priority,'status':'quality_check','failure_reason':None,'updated_at':'now()'}
+            creative=float(project.get('creative_score') or 0); priority=publication_priority(project,creative,result['score']); payload={'quality_score':result['score'],'publication_priority':priority,'output_url':media_url,'status':'quality_check','failure_reason':None,'updated_at':'now()'}
             if thumb_obj: payload['thumbnail_url']=thumb_obj
             patch('video_projects',project['id'],payload); step(project,'final_video_qc','passed',f"Finished-video score {result['score']}/100. Actual MP4 passed semantic relevance, motion, freeze, black-frame, silence, duration, aspect-ratio and sound-master checks."); print(f'FINAL_QC_PASS project={project_id} score={result["score"]} priority={priority}')
     except Exception as exc:
