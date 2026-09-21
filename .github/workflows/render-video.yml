@@ -70,6 +70,7 @@ jobs:
           esac
       - name: Install renderer
         run: |
+          python -m pip install --quiet boto3
           if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v blender >/dev/null 2>&1; then sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core blender; fi
           blender --version
           python - <<'PY' || python -m pip install --quiet piper-tts==1.6.0
@@ -84,5 +85,11 @@ jobs:
           PYTHONPATH: scripts
           PIPER_VOICE_DIR: .piper-voices
           ROLIXA_VISUAL_CACHE: .rolixa-cache
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          ROLIXA_R2_MAX_STORAGE_BYTES: '9500000000'
+          ROLIXA_R2_PRESIGN_SECONDS: '518400'
           ROLIXA_WORKER: ${{ matrix.worker }}
         run: python scripts/render_with_metrics.py
