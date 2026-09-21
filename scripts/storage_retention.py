@@ -16,8 +16,15 @@ HEADERS={"apikey":KEY,"Authorization":f"Bearer {KEY}","Content-Type":"applicatio
 
 def get(path):
     req=urllib.request.Request(URL+path,headers=HEADERS,method="GET")
-    with urllib.request.urlopen(req,timeout=90) as r:
-        return json.loads(r.read().decode()) if r.readable() else []
+    try:
+        with urllib.request.urlopen(req,timeout=90) as r:
+            raw = r.read()
+            return json.loads(raw.decode()) if raw else []
+    except urllib.error.HTTPError as exc:
+        if exc.code == 402:
+            print(json.dumps({"mode":"blocked","http":402,"message":"Supabase REST is currently restricted; retention will retry automatically after the restriction clears."}))
+            raise SystemExit(0)
+        raise
 
 def delete_objects(paths):
     if not paths:return
