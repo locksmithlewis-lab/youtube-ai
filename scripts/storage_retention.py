@@ -5,7 +5,7 @@ import urllib.error, urllib.parse, urllib.request
 URL=os.environ.get("SUPABASE_URL","").rstrip("/")
 KEY=os.environ.get("SUPABASE_SERVICE_ROLE_KEY","")
 BUCKET=os.environ.get("ROLIXA_STORAGE_BUCKET","video-outputs")
-RETENTION_DAYS=int(os.environ.get("ROLIXA_ARCHIVE_AFTER_DAYS","7"))
+RETENTION_DAYS=int(os.environ.get("ROLIXA_ARCHIVE_AFTER_DAYS","2"))
 KEEP_VIEWS=int(os.environ.get("ROLIXA_KEEP_VIEWS","100"))
 DRY_RUN=os.environ.get("ROLIXA_RETENTION_DRY_RUN","0")=="1"
 
