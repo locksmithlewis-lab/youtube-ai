@@ -21,6 +21,11 @@ try:
 except ImportError:
     r2_configured = lambda: False
     r2_upload_file = None
+try:
+    from b2_storage import configured as b2_configured, upload_file as b2_upload_file
+except ImportError:
+    b2_configured = lambda: False
+    b2_upload_file = None
 
 TUS_VERSION = "1.0.0"
 DEFAULT_CHUNK = 6 * 1024 * 1024
@@ -239,8 +244,20 @@ def upload_bytes(data, supabase_url, key, bucket, obj, mime="application/octet-s
 
 def upload_file(path, supabase_url, key, bucket, obj, mime="application/octet-stream", upsert=True):
     path = Path(path)
-    if bucket == "video-outputs" and r2_configured():
-        return r2_upload_file(path, obj, mime=mime, upsert=upsert)
+    if bucket == "video-outputs":
+        primary_error = None
+        if r2_configured():
+            try:
+                return r2_upload_file(path, obj, mime=mime, upsert=upsert)
+            except Exception as exc:
+                primary_error = exc
+        if b2_configured():
+            try:
+                return b2_upload_file(path, obj, mime=mime)
+            except Exception as exc:
+                if primary_error:
+                    raise RuntimeError(f"R2 upload failed ({primary_error}); B2 fallback also failed ({exc}).") from exc
+                raise
     if mime == "video/mp4" and bucket == "video-outputs" and path.stat().st_size > VIDEO_BUCKET_SOFT_LIMIT:
         data = _fit_video_bytes(path.read_bytes())
         return upload_bytes(data, supabase_url, key, bucket, obj, mime, upsert)
