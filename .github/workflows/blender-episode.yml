@@ -31,6 +31,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  backend-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      available: ${{ steps.backend.outputs.available }}
+    steps:
+      - name: Check Supabase backend availability
+        id: backend
+        env:
+          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set +e
+          code=$(curl -sS -o /tmp/supabase-check.json -w "%{http_code}" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            "$SUPABASE_URL/rest/v1/video_projects?select=id&limit=1")
+          if [ "$code" = "200" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Supabase unavailable/restricted (HTTP $code). Blender episode skipped."
+          fi
+
   preflight:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -53,7 +77,8 @@ jobs:
             scripts/register_blender_episode.py
 
   build-common-library:
-    needs: preflight
+    needs: [backend-preflight, preflight]
+    if: needs.backend-preflight.outputs.available == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
