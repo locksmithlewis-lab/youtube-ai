@@ -43,7 +43,7 @@ def req(method, path, data=None, prefer=None):
 
 
 def upload(obj):
-    upload_file(MASTER, URL, KEY, 'video-outputs', obj, mime='video/mp4', upsert=True)
+    return upload_file(MASTER, URL, KEY, 'video-outputs', obj, mime='video/mp4', upsert=True)
 
 
 def set_step(project, name, status, detail):
@@ -118,9 +118,10 @@ def main():
         project = one(f"/rest/v1/video_projects?id=eq.{project['id']}&select=*&limit=1")
 
     obj = f"{uid}/{project['id']}/blackstar-s01e01-master.mp4"
-    upload(obj)
-    req('PATCH', f"/rest/v1/video_projects?id=eq.{project['id']}", {'output_url': obj, 'updated_at': stamp}, 'return=minimal')
-    project['output_url'] = obj
+    stored = upload(obj)
+    media_url = stored.get('url') or obj
+    req('PATCH', f"/rest/v1/video_projects?id=eq.{project['id']}", {'output_url': media_url, 'updated_at': stamp}, 'return=minimal')
+    project['output_url'] = media_url
 
     render = one(f"/rest/v1/render_jobs?project_id=eq.{project['id']}&engine=eq.github-actions-blender-eevee-piper&select=*&limit=1")
     if not render:
@@ -132,7 +133,7 @@ def main():
         render = rows[0]
     else:
         req('PATCH', f"/rest/v1/render_jobs?id=eq.{render['id']}", {
-            'status': 'completed', 'output_url': obj, 'media_duration_seconds': float(ep['target_duration_seconds']),
+            'status': 'completed', 'output_url': media_url, 'media_duration_seconds': float(ep['target_duration_seconds']),
             'completed_at': stamp, 'updated_at': stamp, 'error': None,
         }, 'return=minimal')
 
