@@ -126,7 +126,7 @@ def main():
     if not render:
         rows = req('POST', '/rest/v1/render_jobs', {
             'user_id': uid, 'project_id': project['id'], 'engine': 'github-actions-blender-eevee-piper',
-            'status': 'completed', 'output_url': obj, 'media_duration_seconds': float(ep['target_duration_seconds']),
+            'status': 'completed', 'output_url': media_url, 'media_duration_seconds': float(ep['target_duration_seconds']),
             'started_at': stamp, 'completed_at': stamp, 'updated_at': stamp,
         }, 'return=representation') or []
         render = rows[0]
