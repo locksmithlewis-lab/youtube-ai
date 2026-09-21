@@ -16,6 +16,12 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+try:
+    from r2_storage import configured as r2_configured, upload_file as r2_upload_file, _client as r2_client
+except ImportError:
+    r2_configured = lambda: False
+    r2_upload_file = None
+
 TUS_VERSION = "1.0.0"
 DEFAULT_CHUNK = 6 * 1024 * 1024
 RESUMABLE_THRESHOLD = 6 * 1024 * 1024
@@ -217,6 +223,13 @@ def _fit_video_bytes(data, limit=VIDEO_BUCKET_SOFT_LIMIT):
 
 
 def upload_bytes(data, supabase_url, key, bucket, obj, mime="application/octet-stream", upsert=True):
+    if bucket == "video-outputs" and r2_configured():
+        with tempfile.NamedTemporaryFile(suffix=Path(obj).suffix or '.bin', delete=False) as tmp:
+            tmp.write(bytes(data)); tmp_path = Path(tmp.name)
+        try:
+            return r2_upload_file(tmp_path, obj, mime=mime, upsert=upsert)
+        finally:
+            tmp_path.unlink(missing_ok=True)
     if mime == "video/mp4" and bucket == "video-outputs":
         data = _fit_video_bytes(bytes(data))
     if len(data) <= RESUMABLE_THRESHOLD:
@@ -226,6 +239,8 @@ def upload_bytes(data, supabase_url, key, bucket, obj, mime="application/octet-s
 
 def upload_file(path, supabase_url, key, bucket, obj, mime="application/octet-stream", upsert=True):
     path = Path(path)
+    if bucket == "video-outputs" and r2_configured():
+        return r2_upload_file(path, obj, mime=mime, upsert=upsert)
     if mime == "video/mp4" and bucket == "video-outputs" and path.stat().st_size > VIDEO_BUCKET_SOFT_LIMIT:
         data = _fit_video_bytes(path.read_bytes())
         return upload_bytes(data, supabase_url, key, bucket, obj, mime, upsert)
