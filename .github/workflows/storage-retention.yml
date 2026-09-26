@@ -10,6 +10,7 @@ on:
       - 'scripts/storage_retention.py'
       - 'scripts/r2_storage.py'
       - 'scripts/r2_retention.py'
+      - 'scripts/b2_retention.py'
       - 'scripts/production_status.py'
       - '.github/workflows/storage-retention.yml'
 
@@ -83,3 +84,21 @@ jobs:
           ROLIXA_R2_RETENTION_DAYS: '2'
           ROLIXA_R2_RETENTION_DRY_RUN: '0'
         run: python3 scripts/r2_retention.py
+
+  b2-retention:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install B2 client
+        run: python -m pip install --quiet boto3
+      - name: Retain only recent B2 MP4s
+        env:
+          B2_ENDPOINT: ${{ secrets.B2_ENDPOINT }}
+          B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
+          B2_SECRET_ACCESS_KEY: ${{ secrets.B2_SECRET_ACCESS_KEY }}
+          B2_BUCKET: ${{ secrets.B2_BUCKET }}
+          B2_REGION: ${{ secrets.B2_REGION }}
+          ROLIXA_B2_RETENTION_DAYS: '2'
+          ROLIXA_B2_RETENTION_DRY_RUN: '0'
+        run: python3 scripts/b2_retention.py
