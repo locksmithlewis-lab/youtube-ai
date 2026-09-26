@@ -35,6 +35,41 @@ def age_hours(v):
 def patch(table,id,data):
     return req("PATCH",f"/rest/v1/{table}?id=eq.{id}",data)
 
+
+def storage_probe():
+    result=[]
+    for name, module_name, configured_name, usage_name, limit_env, default_limit in [
+        ("R2","r2_storage","configured","usage_bytes","ROLIXA_R2_MAX_STORAGE_BYTES","9500000000"),
+        ("B2","b2_storage","configured","usage_bytes","ROLIXA_B2_MAX_STORAGE_BYTES","9000000000"),
+    ]:
+        item={"backend":name,"configured":False,"healthy":False}
+        try:
+            mod=__import__(module_name)
+            item["configured"]=bool(getattr(mod,configured_name)())
+            if item["configured"]:
+                used=int(getattr(mod,usage_name)())
+                limit=int(os.environ.get(limit_env,default_limit))
+                item.update({"healthy":used<=limit,"used_bytes":used,"limit_bytes":limit,"utilization":round(used/limit,4) if limit else 1})
+                if used>limit:item["message"]="Storage safety cap exceeded."
+            else:item["message"]="Not configured."
+        except Exception as exc:
+            item["message"]=str(exc)[:500]
+        result.append(item)
+    return result
+
+def provider_probe():
+    result=[]
+    for name,url in [("GitHub","https://api.github.com/rate_limit"),("YouTube","https://www.youtube.com/")]:
+        try:
+            req=urllib.request.Request(url,headers={"User-Agent":"Rolixa-Watchdog/1.0"})
+            with urllib.request.urlopen(req,timeout=15) as r:
+                result.append({"provider":name,"healthy":200<=r.status<400,"http":r.status})
+        except urllib.error.HTTPError as e:
+            result.append({"provider":name,"healthy":False,"http":e.code,"message":str(e)[:300]})
+        except Exception as e:
+            result.append({"provider":name,"healthy":False,"message":str(e)[:300]})
+    return result
+
 def diagnose():
     projects=req("GET","/rest/v1/video_projects?select=id,title,status,updated_at,output_url,failure_reason&limit=1000")
     jobs=req("GET","/rest/v1/render_jobs?select=id,project_id,status,created_at,started_at,completed_at,error&limit=1000")
@@ -86,9 +121,14 @@ def main():
     if not URL or not KEY: raise SystemExit("Supabase secrets required.")
     projects,jobs,findings=diagnose()
     if isinstance(projects,dict) and projects.get("_error"):
-        print(json.dumps({"status":"blocked","findings":findings},indent=2)); return 2
+        print(json.dumps({"status":"blocked","findings":findings,"storage":storage_probe(),"providers":provider_probe()},indent=2)); return 2
+    storage=storage_probe()
+    providers=provider_probe()
+    for s in storage:
+        if s.get("configured") and not s.get("healthy"):
+            findings.append({"severity":"critical","area":"storage","backend":s["backend"],"message":s.get("message","Storage safety limit reached.")})
     actions=recover(projects,jobs,findings)
-    out={"status":"attention" if findings else "healthy","generated_at":datetime.now(timezone.utc).isoformat(),"findings":findings,"actions":actions}
+    out={"status":"attention" if findings else "healthy","generated_at":datetime.now(timezone.utc).isoformat(),"storage":storage,"providers":providers,"findings":findings,"actions":actions}
     print(json.dumps(out,indent=2))
     return 0
 
