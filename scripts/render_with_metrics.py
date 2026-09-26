@@ -19,6 +19,11 @@ try:
 except ImportError:
     r2_configured = lambda: False
     r2_download_file = None
+try:
+    from b2_storage import configured as b2_configured, download_file as b2_download_file
+except ImportError:
+    b2_configured = lambda: False
+    b2_download_file = None
 
 URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
@@ -140,17 +145,20 @@ def preflight_queue():
 
 
 def download_output(obj, path):
+    errors = []
     if r2_configured():
-        r2_download_file(obj, path)
-        return
-    url = URL + '/storage/v1/object/video-outputs/' + urllib.parse.quote(obj, safe='/')
-    request = urllib.request.Request(url, headers={'apikey': KEY, 'Authorization': f'Bearer {KEY}'})
-    with urllib.request.urlopen(request, timeout=600) as response, open(path, 'wb') as handle:
-        while True:
-            chunk = response.read(1024 * 1024)
-            if not chunk:
-                break
-            handle.write(chunk)
+        try:
+            r2_download_file(obj, path)
+            return
+        except Exception as exc:
+            errors.append(f"R2: {exc}")
+    if b2_configured():
+        try:
+            b2_download_file(obj, path)
+            return
+        except Exception as exc:
+            errors.append(f"B2: {exc}")
+    raise RuntimeError("No approved media backend could retrieve the video. Supabase Storage is disabled for video-outputs. " + " | ".join(errors))
 
 
 def upload(path, bucket, obj, mime, replace=False):
@@ -198,7 +206,7 @@ def post_render_qc(project_id, job_id, obj):
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
             raw=Path(temp_dir)/'raw.mp4'; master=Path(temp_dir)/'master.mp4'
-            # Prefer the renderer's local output. It is still uploaded to Supabase for durable storage/publication, but QC no longer downloads the same MP4 back from Storage.
+            # Prefer the renderer's local output. Video outputs live only in R2/B2; Supabase remains metadata/control-plane only.
             local_output=Path('render-work') / str(job_id) / 'output.mp4'
             if local_output.exists() and local_output.stat().st_size > 0:
                 raw.write_bytes(local_output.read_bytes())
