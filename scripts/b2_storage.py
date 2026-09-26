@@ -3,6 +3,25 @@ import os
 from pathlib import Path
 
 PRESIGN_SECONDS = min(604800, int(os.environ.get("ROLIXA_B2_PRESIGN_SECONDS", "518400")))
+MAX_STORAGE_BYTES = int(os.environ.get("ROLIXA_B2_MAX_STORAGE_BYTES", "9000000000"))
+
+def usage_bytes():
+    client = _client()
+    total = 0
+    token = {}
+    while True:
+        page = client.list_objects_v2(Bucket=os.environ["B2_BUCKET"], **token)
+        total += sum(int(obj.get("Size") or 0) for obj in page.get("Contents", []))
+        if not page.get("IsTruncated"):
+            return total
+        token = {"ContinuationToken": page["NextContinuationToken"]}
+
+def _guard_capacity(additional_bytes):
+    used = usage_bytes()
+    projected = used + int(additional_bytes)
+    if projected > MAX_STORAGE_BYTES:
+        raise RuntimeError(f"B2 safety cap exceeded: {used} + {additional_bytes} > {MAX_STORAGE_BYTES} bytes.")
+
 
 def configured():
     return all(os.environ.get(k) for k in ("B2_ENDPOINT","B2_ACCESS_KEY_ID","B2_SECRET_ACCESS_KEY","B2_BUCKET"))
@@ -22,6 +41,7 @@ def _client():
 def upload_file(path, key, mime="application/octet-stream"):
     p=Path(path)
     client=_client()
+    _guard_capacity(p.stat().st_size)
     client.upload_file(str(p), os.environ["B2_BUCKET"], key, ExtraArgs={"ContentType":mime})
     url=client.generate_presigned_url("get_object", Params={"Bucket":os.environ["B2_BUCKET"],"Key":key}, ExpiresIn=PRESIGN_SECONDS)
     return {"bucket":os.environ["B2_BUCKET"],"key":key,"url":url,"bytes":p.stat().st_size,"backend":"b2"}
