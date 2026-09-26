@@ -1,4 +1,4 @@
-"""Reliable Supabase Storage transport for large video outputs.
+"""Media transport for Rolixa: R2 primary, B2 failover; Supabase is not a video-output backend.
 
 Large files use the TUS resumable endpoint and the direct Storage hostname.
 A narrowly-scoped compatibility shim upgrades legacy urllib POST uploads of
@@ -228,11 +228,11 @@ def _fit_video_bytes(data, limit=VIDEO_BUCKET_SOFT_LIMIT):
 
 
 def upload_bytes(data, supabase_url, key, bucket, obj, mime="application/octet-stream", upsert=True):
-    if bucket == "video-outputs" and r2_configured():
+    if bucket == "video-outputs":
         with tempfile.NamedTemporaryFile(suffix=Path(obj).suffix or '.bin', delete=False) as tmp:
             tmp.write(bytes(data)); tmp_path = Path(tmp.name)
         try:
-            return r2_upload_file(tmp_path, obj, mime=mime, upsert=upsert)
+            return upload_file(tmp_path, supabase_url, key, bucket, obj, mime=mime, upsert=upsert)
         finally:
             tmp_path.unlink(missing_ok=True)
     if mime == "video/mp4" and bucket == "video-outputs":
@@ -258,6 +258,7 @@ def upload_file(path, supabase_url, key, bucket, obj, mime="application/octet-st
                 if primary_error:
                     raise RuntimeError(f"R2 upload failed ({primary_error}); B2 fallback also failed ({exc}).") from exc
                 raise
+        raise RuntimeError("No approved video media backend is available. Supabase Storage is disabled for video-outputs.")
     if mime == "video/mp4" and bucket == "video-outputs" and path.stat().st_size > VIDEO_BUCKET_SOFT_LIMIT:
         data = _fit_video_bytes(path.read_bytes())
         return upload_bytes(data, supabase_url, key, bucket, obj, mime, upsert)
