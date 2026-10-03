@@ -2,9 +2,6 @@ name: Publish Existing R2 Batch
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/publish-existing-r2-batch.yml'
 
 permissions:
   contents: read
