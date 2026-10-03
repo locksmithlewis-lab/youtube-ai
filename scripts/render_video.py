@@ -420,6 +420,16 @@ try:
         record_asset(job, project, index, plan, asset)
         assets.append(asset)
         clips.append(clip)
+        # Stop early rather than spend a full render on a montage that cannot pass publish QC.
+        graphic_count = sum(a.get('media_type') == 'graphic' for a in assets)
+        graphic_limit = math.ceil(scene_count * (.40 if longform else .35))
+        if graphic_count > graphic_limit:
+            raise RuntimeError(
+                f"Visual source coverage is insufficient: {graphic_count}/{len(assets)} scenes fell back to motion graphics, "
+                f"already beyond the publish limit of {graphic_limit}/{scene_count}. "
+                "Check PEXELS_API_KEY in GitHub Actions secrets and confirm public footage sources are reachable. "
+                "The video was stopped before full rendering and will not publish."
+            )
 
     reasons, warnings, avg, providers, images, videos, graphics = visual_qc(assets, scene_count, longform)
     if reasons:
