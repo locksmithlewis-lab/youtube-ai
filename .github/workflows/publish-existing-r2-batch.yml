@@ -24,7 +24,7 @@ jobs:
           GITHUB_ACTIONS_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          RESPONSE="$(curl -fsS -X POST             -H "Authorization: Bearer $GITHUB_ACTIONS_TOKEN"             -H "Content-Type: application/json"             https://rolixa-bey56lewis-4041.vercel.app/api/github-youtube-access)"
+          RESPONSE="$(curl -fsS -X POST             -H "Authorization: Bearer $GITHUB_ACTIONS_TOKEN"             -H "Content-Type: application/json"             https://rolixa-bey56lewis-4041.vercel.app/api/youtube-start)"
           ACCESS_TOKEN="$(python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' <<<"$RESPONSE")"
           test -n "$ACCESS_TOKEN"
           echo "::add-mask::$ACCESS_TOKEN"
