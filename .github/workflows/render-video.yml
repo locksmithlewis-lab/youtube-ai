@@ -184,3 +184,5 @@ jobs:
 # S3 cleanup migration kick
 
 # Offline external-media batch kick
+
+# explicit offline batch kick
