@@ -29,7 +29,14 @@ def sb(path, method="GET", body=None):
 
 def main():
     jobs=json.loads(BATCH.read_text())["jobs"]
-    channels=sb("production_channels?enabled=eq.true&publish_enabled=eq.true&platform=eq.youtube&select=id,user_id,channel_title&order=created_at.asc&limit=1")
+    try:
+        channels=sb("production_channels?enabled=eq.true&publish_enabled=eq.true&platform=eq.youtube&select=id,user_id,channel_title&order=created_at.asc&limit=1")
+    except Exception as exc:
+        if "Supabase 402" in str(exc):
+            print("SUPABASE_RESTRICTED: renders remain safely stored in R2; registration/publishing will resume automatically when the control plane is restored.")
+            print("PENDING_OFFLINE_PUBLISH="+json.dumps([j["id"] for j in jobs]))
+            return 2
+        raise
     if not channels: raise RuntimeError("No enabled YouTube production channel is configured.")
     channel=channels[0]
     r2=boto3.client("s3",endpoint_url=f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com",
@@ -67,5 +74,6 @@ def main():
         registered.append(project_id)
         print(f"REGISTERED {job_id} -> {project_id} -> {url}")
     print("REGISTERED_PROJECT_IDS="+json.dumps(registered))
+    return 0
 
-if __name__=="__main__": main()
+if __name__=="__main__": raise SystemExit(main())
