@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "offline-ai-sci-fi-001",
+      "user_id": "offline",
+      "project_id": "offline-ai-sci-fi-001",
+      "project": {
+        "id": "offline-ai-sci-fi-001",
+        "user_id": "offline",
+        "title": "5 AI Tools That Feel Like Sci-Fi",
+        "topic": "Five practical AI tools and workflows that feel like science fiction",
+        "format": "Short",
+        "style": "Hype",
+        "target_duration_seconds": 45,
+        "status": "generating",
+        "script": "What if your computer could stop waiting for instructions and start doing the work? Today, five AI tools make that idea feel surprisingly real. First, an AI coding agent can turn a plain English request into working software. Second, voice tools can turn a rough idea into polished narration. Third, image and video models can create visuals from a sentence. Fourth, local AI can run privately on your own machine. And fifth, automation tools can connect all of those pieces into one workflow. None of this is science fiction anymore. The strange part is how quickly it became normal."
+      }
+    },
+    {
+      "id": "offline-internet-change-002",
+      "user_id": "offline",
+      "project_id": "offline-internet-change-002",
+      "project": {
+        "id": "offline-internet-change-002",
+        "user_id": "offline",
+        "title": "The Internet Is About to Change Again",
+        "topic": "How AI agents, local models, and automation are changing everyday software",
+        "format": "Short",
+        "style": "Tech",
+        "target_duration_seconds": 45,
+        "status": "generating",
+        "script": "The next big change on the internet may not look like a new social network. It may look like software that actually does things for you. AI agents can already take a goal, break it into steps, use tools, and return a result. Local models push another change by keeping more work on your own computer. Put those together with automation, and an app becomes less like a menu and more like a teammate. You stop asking which button to press and start describing what you want done. That shift could change how people use software every day."
+      }
+    },
+    {
+      "id": "offline-games-real-003",
+      "user_id": "offline",
+      "project_id": "offline-games-real-003",
+      "project": {
+        "id": "offline-games-real-003",
+        "user_id": "offline",
+        "title": "Why Games Are Getting More Real",
+        "topic": "The technology pushing game worlds, physics, and NPC behavior forward",
+        "format": "Short",
+        "style": "Gaming",
+        "target_duration_seconds": 45,
+        "status": "generating",
+        "script": "Game graphics are only part of the reason modern games feel more real. The bigger change is what happens underneath the picture. Better physics lets objects react in believable ways. Faster hardware gives developers more room for detailed worlds and complex simulations. Procedural systems can build variety without hand-authoring every possible scene. And smarter character systems can make non-player characters react to what the player actually does. Put those pieces together and a game world starts feeling less like a collection of levels and more like a system. The next leap may come from combining all of them."
+      }
+    },
+    {
+      "id": "offline-timing-science-004",
+      "user_id": "offline",
+      "project_id": "offline-timing-science-004",
+      "project": {
+        "id": "offline-timing-science-004",
+        "user_id": "offline",
+        "title": "The Science Behind Perfect Timing",
+        "topic": "Why tiny timing differences can completely change what we see and hear",
+        "format": "Short",
+        "style": "Science",
+        "target_duration_seconds": 45,
+        "status": "generating",
+        "script": "Why can a tiny timing change make the same moment feel completely different? Your brain constantly combines signals arriving from different senses. When those signals line up, an event can feel immediate and natural. When they drift apart, the same event can feel strange or disconnected. Timing also changes rhythm, attention, and expectation. That is why filmmakers, musicians, athletes, and game designers care about fractions of a second. The interesting part is that perfect timing is rarely about one exact number. It is about keeping many small signals synchronized well enough that your brain experiences them as one event."
+      }
+    },
+    {
+      "id": "offline-personal-ai-005",
+      "user_id": "offline",
+      "project_id": "offline-personal-ai-005",
+      "project": {
+        "id": "offline-personal-ai-005",
+        "user_id": "offline",
+        "title": "The Next Generation of Personal AI",
+        "topic": "What changes when an AI assistant can remember, plan, and use tools",
+        "format": "Short",
+        "style": "Tech",
+        "target_duration_seconds": 45,
+        "status": "generating",
+        "script": "A chatbot answers questions. A personal AI could do much more. The difference starts with memory, because an assistant that can remember useful preferences does not need every conversation to begin from zero. Add planning, and it can break a goal into steps instead of waiting for one prompt at a time. Add tools, and it can work with files, calendars, code, websites, or other software. The result is a different kind of assistant: less like a search box and more like a digital operator. The hardest part may not be making it smarter. It may be making it reliable and safe enough to trust."
+      }
+    }
+  ]
+}
