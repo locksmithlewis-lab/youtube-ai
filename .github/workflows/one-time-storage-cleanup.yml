@@ -21,11 +21,10 @@ jobs:
           set -euo pipefail
           test -n "$SUPABASE_SERVICE_ROLE_KEY"
 
+          npm init -y >/dev/null 2>&1
+          npm install --silent @supabase/supabase-js
           cat > /tmp/cleanup.mjs <<'JS'
-          import { createClient } from 'npm:@supabase/supabase-js@2'
-          JS
-          cat > /tmp/cleanup.mjs <<'JS'
-          import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+          import { createClient } from "@supabase/supabase-js";
           const url = process.env.SUPABASE_URL;
           const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
           const supabase = createClient(url, key);
