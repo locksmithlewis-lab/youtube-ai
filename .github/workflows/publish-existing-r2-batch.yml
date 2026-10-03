@@ -18,15 +18,24 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install R2 client
         run: python -m pip install --quiet boto3
+      - name: Obtain short-lived YouTube access
+        id: youtube_auth
+        env:
+          GITHUB_ACTIONS_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RESPONSE="$(curl -fsS -X POST             -H "Authorization: Bearer $GITHUB_ACTIONS_TOKEN"             -H "Content-Type: application/json"             https://rolixa-bey56lewis-4041.vercel.app/api/github-youtube-access)"
+          ACCESS_TOKEN="$(python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' <<<"$RESPONSE")"
+          test -n "$ACCESS_TOKEN"
+          echo "::add-mask::$ACCESS_TOKEN"
+          echo "access_token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
       - name: Publish already-rendered videos and verify public status
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_ACCESS_TOKEN: ${{ steps.youtube_auth.outputs.access_token }}
           ROLIXA_OFFLINE_BATCH: config/offline_render_batch.json
         run: node scripts/publish_offline_direct.js
       - name: Save verified publication report
