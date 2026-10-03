@@ -118,7 +118,7 @@ def main():
     series = one('/rest/v1/series_projects?title=eq.' + urllib.parse.quote(ep['series']) + '&select=*&limit=1')
     if not series:
         rows = req('POST', '/rest/v1/series_projects', {
-            'user_id': uid, 'title': ep['series'], 'series_type': 'animated_series',
+            'user_id': uid, 'production_channel_id': channel['id'], 'title': ep['series'], 'series_type': 'animated_series',
             'premise': 'An original frontier military science-fiction squad investigates a disappearance that reveals an approaching interstellar threat.',
             'style': 'original cinematic military science fiction animation',
             'episode_length_seconds': int(ep['target_duration_seconds']), 'cadence': 'manual',
@@ -211,6 +211,10 @@ def main():
         'status': 'quality_check', 'failure_reason': None if creative['passed'] and qc['passed'] else 'Episode is awaiting publish-grade QC corrections.',
         'updated_at': stamp,
     }, 'return=minimal')
+
+    if series.get('production_channel_id') != channel['id']:
+        req('PATCH', f"/rest/v1/series_projects?id=eq.{series['id']}", {'production_channel_id': channel['id'], 'updated_at': stamp}, 'return=minimal')
+        series['production_channel_id'] = channel['id']
 
     episode = one(f"/rest/v1/series_episodes?series_id=eq.{series['id']}&episode_number=eq.{int(ep['episode'])}&select=*&limit=1")
     continuity = {'continuity_out': m['segments'][-1]['continuity_out'], 'manifest': 'episodes/blackstar-s01e01/episode.json', 'screenplay': 'episodes/blackstar-s01e01/screenplay.md'}
