@@ -7,6 +7,10 @@ on:
         description: Path to committed episode manifest
         required: true
         default: episodes/blackstar-s01e01/episode.json
+      channel_id:
+        description: Optional YouTube channel ID for multi-channel publishing
+        required: false
+        default: ''
   push:
     branches: [main]
     paths:
@@ -278,6 +282,7 @@ jobs:
           ROLIXA_R2_MAX_STORAGE_BYTES: '9500000000'
           ROLIXA_R2_PRESIGN_SECONDS: '518400'
           ROLIXA_EPISODE_DIR: .rolixa-episode
+          ROLIXA_CHANNEL_ID: ${{ inputs.channel_id }}
           PYTHONPATH: scripts
         run: python scripts/register_blender_episode.py
       - name: Advance only if existing quality gates pass
