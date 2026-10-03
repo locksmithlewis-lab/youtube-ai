@@ -55,17 +55,11 @@ jobs:
             echo "::notice::Supabase storage restriction detected; removing legacy video-outputs media through the Storage API."
             npm install --silent --no-save @supabase/supabase-js
             node scripts/cleanup_supabase_legacy_media.mjs
-          fi
-          code=$(curl -sS -o /tmp/supabase-check.json -w "%{http_code}" \
+            code=$(curl -sS -o /tmp/supabase-check.json -w "%{http_code}" \
               -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
               "$SUPABASE_URL/rest/v1/video_projects?select=id&limit=1")
           fi
-          if [ "$code" != "200" ]; then
-          code=$(curl -sS -o /tmp/supabase-check.json -w "%{http_code}" \
-            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-            "$SUPABASE_URL/rest/v1/video_projects?select=id&limit=1")
           if [ "$code" != "200" ]; then
             echo "available=false" >> "$GITHUB_OUTPUT"
             echo "has_jobs=false" >> "$GITHUB_OUTPUT"
@@ -87,7 +81,6 @@ jobs:
             echo "has_jobs=true" >> "$GITHUB_OUTPUT"
             echo "Queued render found; starting one free-mode worker."
           fi
-
   media-storage-preflight:
     runs-on: ubuntu-latest
     timeout-minutes: 5
