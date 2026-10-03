@@ -1,0 +1,72 @@
+name: One-time storage cleanup
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    if: contains(github.event.head_commit.message, '[one-time-storage-cleanup]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Cleanup obsolete Supabase video outputs
+        env:
+          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_SERVICE_ROLE_KEY"
+
+          cat > /tmp/cleanup.mjs <<'JS'
+          import { createClient } from 'npm:@supabase/supabase-js@2'
+          JS
+          cat > /tmp/cleanup.mjs <<'JS'
+          import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+          const url = process.env.SUPABASE_URL;
+          const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          const supabase = createClient(url, key);
+
+          const { data: projects, error: projectError } = await supabase
+            .from("video_projects")
+            .select("output_url")
+            .not("output_url", "is", null);
+          if (projectError) throw projectError;
+
+          const keep = new Set((projects ?? []).map(x => x.output_url).filter(Boolean));
+
+          async function listAll(prefix = "") {
+            const { data, error } = await supabase.storage.from("video-outputs").list(prefix, { limit: 1000 });
+            if (error) throw error;
+            const files = [];
+            for (const item of data ?? []) {
+              const path = prefix ? prefix + "/" + item.name : item.name;
+              if (item.name.toLowerCase().endsWith(".mp4")) {
+                files.push(path);
+              } else {
+                files.push(...await listAll(path));
+              }
+            }
+            return files;
+          }
+
+          const files = await listAll("");
+          const candidates = files.filter(p => !keep.has("b04cae45-a165-4d66-b88e-e8f043771370/" + p));
+
+          console.log("Total MP4 files:", files.length);
+          console.log("Protected current outputs:", keep.size);
+          console.log("Deletion candidates:", candidates.length);
+
+          for (let i = 0; i < candidates.length; i += 100) {
+            const batch = candidates.slice(i, i + 100);
+            const { error } = await supabase.storage.from("video-outputs").remove(batch);
+            if (error) throw error;
+            console.log(`Deleted batch ${i + 1}-${i + batch.length}`);
+          }
+
+          console.log("Cleanup complete.");
+          JS
+          node /tmp/cleanup.mjs
