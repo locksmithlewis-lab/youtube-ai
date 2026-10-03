@@ -267,7 +267,7 @@ def render_asset(asset, plan, index, seg, frames, work):
 
 
 def render_verified_scene(plan, initial_asset, index, seg, frames, work, used, used_providers):
-    attempted = set()
+    attempted = {initial_asset.get('id')} if initial_asset and initial_asset.get('id') else set()
     candidates = [initial_asset]
     for _ in range(2):
         candidate = choose(plan, used | attempted, .50, used_providers)
