@@ -1,0 +1,64 @@
+name: Blender Demand Batch
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blender-demand-batch-main
+  cancel-in-progress: true
+
+jobs:
+  media-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install storage client
+        run: python -m pip install --quiet boto3
+      - name: Verify R2 capacity
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          ROLIXA_R2_MAX_STORAGE_BYTES: '9000000000'
+          ROLIXA_EXPECTED_RENDER_BYTES: '1000000000'
+          ROLIXA_STORAGE_HEADROOM_BYTES: '250000000'
+        run: python scripts/storage_preflight.py
+
+  render:
+    needs: media-preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Blender renderer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq blender ffmpeg fonts-dejavu-core
+          python -m pip install --quiet boto3 piper-tts==1.6.0
+      - name: Render five Blender videos sequentially
+        env:
+          ROLIXA_OFFLINE_MODE: '1'
+          ROLIXA_OFFLINE_BATCH: config/blender_demand_batch.json
+          PYTHONPATH: scripts
+          PIPER_VOICE_DIR: .piper-voices
+          ROLIXA_VISUAL_CACHE: .rolixa-cache
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          ROLIXA_R2_MAX_STORAGE_BYTES: '9000000000'
+          ROLIXA_R2_PRESIGN_SECONDS: '518400'
+          GENERATIVE_VIDEO_ENABLED: '0'
+          GENERATIVE_VIDEO_PERCENT: '0'
+        run: |
+          set -euo pipefail
+          for worker in 1 2 3 4 5; do
+            echo "::group::Rendering Blender demand video $worker of 5"
+            export ROLIXA_WORKER="$worker"
+            python scripts/render_with_metrics.py
+            echo "::endgroup::"
+          done
