@@ -81,5 +81,6 @@
         "script": "A chatbot answers questions. A personal AI could do much more. The difference starts with memory, because an assistant that can remember useful preferences does not need every conversation to begin from zero. Add planning, and it can break a goal into steps instead of waiting for one prompt at a time. Add tools, and it can work with files, calendars, code, websites, or other software. The result is a different kind of assistant: less like a search box and more like a digital operator. The hardest part may not be making it smarter. It may be making it reliable and safe enough to trust."
       }
     }
-  ]
+  ],
+  "batch_revision": 1
 }
