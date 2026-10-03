@@ -153,7 +153,7 @@ def download_output(obj, path):
             return
         except Exception as exc:
             errors.append(f"R2: {exc}")
-    if b2_configured():
+    if b2_configured() and os.environ.get('ROLIXA_ALLOW_B2_MEDIA','').strip() == '1':
         try:
             b2_download_file(obj, path)
             return
@@ -219,8 +219,12 @@ def post_render_qc(project_id, job_id, obj):
             if not result['passed']:
                 reason='Final video QC failed: '+'; '.join(result['reasons']); patch('video_projects',project['id'],{'quality_score':result['score'],'status':'failed','output_url':None,'failure_reason':reason,'updated_at':'now()'}); patch('render_jobs',job['id'],{'status':'failed','error':reason,'updated_at':'now()'}); step(project,'final_video_qc','failed',f"Finished-video score {result['score']}/100. "+'; '.join(result['reasons'])); raise RuntimeError(reason)
             stored=upload(master,'video-outputs',obj,'video/mp4',replace=True); media_url=stored.get('url') or obj; thumb_obj=None
+            media_backend = 'b2' if stored.get('backend') == 'b2' else ('r2' if stored.get('key') else 'supabase')
+            media_bucket = stored.get('bucket') or (os.environ.get('R2_BUCKET') if media_backend == 'r2' else os.environ.get('B2_BUCKET') if media_backend == 'b2' else 'video-outputs')
+            media_key = stored.get('key') or obj
+            req('POST','/rest/v1/media_objects',{'user_id':project['user_id'],'production_channel_id':project.get('production_channel_id'),'project_id':project['id'],'render_job_id':job_id,'backend':media_backend,'bucket':media_bucket,'object_key':media_key,'bytes':int(stored.get('bytes') or master.stat().st_size),'media_class':'final','protected':True},'return=minimal')
             if longform:
-                thumb=Path(temp_dir)/'thumbnail.jpg'; make_thumbnail(master,project.get('title'),thumb); thumb_obj=f"{project['user_id']}/{project['id']}/{job_id}.jpg"; upload(thumb,'video-thumbnails',thumb_obj,'image/jpeg'); step(project,'thumbnail','passed','Generated a custom 16:9 thumbnail from the finished video with concise title treatment.')
+                thumb=Path(temp_dir)/'thumbnail.jpg'; make_thumbnail(master,project.get('title'),thumb); thumb_obj=f"{project['user_id']}/{project['id']}/{job_id}.jpg"; thumb_stored=upload(thumb,'video-thumbnails',thumb_obj,'image/jpeg'); thumb_url=thumb_stored.get('url') or thumb_obj; thumb_backend='b2' if thumb_stored.get('backend') == 'b2' else ('r2' if thumb_stored.get('key') else 'supabase'); thumb_bucket=thumb_stored.get('bucket') or (os.environ.get('R2_BUCKET') if thumb_backend == 'r2' else os.environ.get('B2_BUCKET') if thumb_backend == 'b2' else 'video-thumbnails'); req('POST','/rest/v1/media_objects',{'user_id':project['user_id'],'production_channel_id':project.get('production_channel_id'),'project_id':project['id'],'render_job_id':job_id,'backend':thumb_backend,'bucket':thumb_bucket,'object_key':thumb_stored.get('key') or thumb_obj,'bytes':int(thumb_stored.get('bytes') or thumb.stat().st_size),'media_class':'final','protected':True},'return=minimal'); thumb_obj=thumb_url; step(project,'thumbnail','passed','Generated a custom 16:9 thumbnail from the finished video with concise title treatment and external media storage.')
             creative=float(project.get('creative_score') or 0); priority=publication_priority(project,creative,result['score']); payload={'quality_score':result['score'],'publication_priority':priority,'output_url':media_url,'status':'quality_check','failure_reason':None,'updated_at':'now()'}
             if thumb_obj: payload['thumbnail_url']=thumb_obj
             patch('video_projects',project['id'],payload); step(project,'final_video_qc','passed',f"Finished-video score {result['score']}/100. Actual MP4 passed semantic relevance, motion, freeze, black-frame, silence, duration, aspect-ratio and sound-master checks."); print(f'FINAL_QC_PASS project={project_id} score={result["score"]} priority={priority}')
