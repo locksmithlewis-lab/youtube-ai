@@ -7,10 +7,10 @@ if(studio){
   const panel=document.createElement('section');panel.id='clipStudioPanel';panel.className='panel series-panel';panel.style.marginTop='22px';
   panel.innerHTML=`<div class="section-head"><div><div class="eyebrow">STREAM CLIPPER</div><h3>Clip long livestreams & gaming VODs</h3><p class="muted small">Make Shorts or standard clips from streams you own or have permission to reuse. Rolixa keeps the full source URL and cut points so the clip is reproducible.</p></div></div>
   <form id="clipForm" class="form-grid">
-    <label class="wide">Stream / VOD URL<input id="clipUrl" type="url" required placeholder="YouTube, Twitch, or another supported stream/VOD URL" /></label>
-    <label class="wide">Clip title<input id="clipTitle" required maxlength="140" placeholder="Best moment / clutch / reaction / highlight" /></label>
-    <label>Start time<input id="clipStart" required placeholder="01:23:45 or 83" /></label>
-    <label>End time<input id="clipEnd" required placeholder="01:24:30 or 128" /></label>
+    <label class="wide">Stream / VOD URL<input id="clipUrl" type="url" required /></label>
+    <label class="wide">Clip title<input id="clipTitle" required maxlength="140" /></label>
+    <label>Start time<input id="clipStart" required /></label>
+    <label>End time<input id="clipEnd" required /></label>
     <label>Output<select id="clipLayout"><option value="vertical">Vertical Short 9:16</option><option value="original">Original aspect</option></select></label>
     <label>Style<select id="clipStyle"><option>Gaming</option><option>Reaction</option><option>Podcast</option><option>Sports</option><option>Livestream</option></select></label>
     <label class="wide check-row"><input id="clipRights" type="checkbox" required /> I own this footage or have permission to reuse and monetize this clip.</label>
