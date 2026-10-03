@@ -182,3 +182,5 @@ jobs:
 # Manual queue kick: run the existing renderer against the current queued job.
 
 # S3 cleanup migration kick
+
+# Offline external-media batch kick
