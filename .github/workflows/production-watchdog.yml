@@ -16,7 +16,7 @@ permissions:
 
 concurrency:
   group: rolixa-production-watchdog
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   troubleshoot:
