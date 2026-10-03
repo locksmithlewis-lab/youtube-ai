@@ -1,0 +1,75 @@
+name: Offline Render Batch
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'config/offline_render_batch.json'
+      - 'scripts/render_video.py'
+      - 'scripts/render_with_metrics.py'
+      - 'scripts/storage_upload.py'
+      - 'scripts/r2_storage.py'
+      - '.github/workflows/offline-render-batch.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offline-render-batch-main
+  cancel-in-progress: false
+
+jobs:
+  media-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify R2 capacity
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          ROLIXA_R2_MAX_STORAGE_BYTES: '9000000000'
+          ROLIXA_EXPECTED_RENDER_BYTES: '750000000'
+          ROLIXA_STORAGE_HEADROOM_BYTES: '250000000'
+          ROLIXA_ALLOW_B2_MEDIA: '0'
+        run: |
+          python -m pip install --quiet boto3
+          python scripts/storage_preflight.py
+
+  render:
+    needs: media-preflight
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        worker: [1, 2, 3, 4, 5]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install renderer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          python -m pip install --quiet boto3 piper-tts==1.6.0
+      - name: Render batch member
+        env:
+          ROLIXA_OFFLINE_MODE: '1'
+          ROLIXA_OFFLINE_BATCH: config/offline_render_batch.json
+          ROLIXA_WORKER: ${{ matrix.worker }}
+          PYTHONPATH: scripts
+          PIPER_VOICE_DIR: .piper-voices
+          ROLIXA_VISUAL_CACHE: .rolixa-cache
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          ROLIXA_R2_MAX_STORAGE_BYTES: '9000000000'
+          ROLIXA_R2_PRESIGN_SECONDS: '518400'
+          GENERATIVE_VIDEO_ENABLED: '0'
+          GENERATIVE_VIDEO_PERCENT: '0'
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: python scripts/render_with_metrics.py
