@@ -82,10 +82,35 @@ def main():
     m = json.loads(MANIFEST.read_text(encoding='utf-8'))
     ep = m['episode']
     stamp = now_iso()
-    user = one('/rest/v1/youtube_connections?status=eq.connected&select=user_id&limit=1')
+    requested_channel = os.environ.get('ROLIXA_CHANNEL_ID', '').strip()
+    user_query = '/rest/v1/youtube_connections?status=eq.connected&select=user_id,channel_id,channel_title'
+    if requested_channel:
+        user_query += '&channel_id=eq.' + urllib.parse.quote(requested_channel, safe='')
+    user_query += '&limit=1'
+    user = one(user_query)
     if not user:
-        raise SystemExit('No connected production YouTube user found')
+        raise SystemExit('No connected production YouTube channel matched the requested channel ID')
     uid = user['user_id']
+    channel_id = user.get('channel_id') or requested_channel or 'legacy'
+    channel_title = user.get('channel_title') or channel_id
+
+    channel = one(
+        '/rest/v1/production_channels?user_id=eq.' + urllib.parse.quote(uid, safe='') +
+        '&channel_id=eq.' + urllib.parse.quote(channel_id, safe='') +
+        '&select=*&limit=1'
+    )
+    if not channel:
+        rows = req('POST', '/rest/v1/production_channels', {
+            'user_id': uid,
+            'channel_id': channel_id,
+            'channel_title': channel_title,
+            'storage_backend': 'r2',
+            'storage_soft_limit_bytes': 9000000000,
+            'retention_days': 30,
+            'enabled': True,
+            'publish_enabled': True,
+        }, 'return=representation') or []
+        channel = rows[0]
     title = f"{ep['series']} — S{ep['season']}E{ep['episode']}: {ep['title']}"
     script = screenplay_text(m)
     hook = 'Thirty-eight thousand colonists vanished without a single distress call.'
@@ -104,7 +129,7 @@ def main():
     project = one('/rest/v1/video_projects?title=eq.' + urllib.parse.quote(title) + '&select=*&limit=1')
     if not project:
         rows = req('POST', '/rest/v1/video_projects', {
-            'user_id': uid, 'title': title, 'topic': ep['title'], 'format': 'animated series',
+            'user_id': uid, 'production_channel_id': channel['id'], 'title': title, 'topic': ep['title'], 'format': 'animated series',
             'style': 'animated_drama', 'target_duration_seconds': int(ep['target_duration_seconds']),
             'status': 'quality_check', 'script': script, 'hook': hook, 'voice': 'multi-character Piper cast',
             'failure_reason': None,
@@ -112,7 +137,7 @@ def main():
         project = rows[0]
     else:
         req('PATCH', f"/rest/v1/video_projects?id=eq.{project['id']}", {
-            'status': 'quality_check', 'script': script, 'hook': hook,
+            'status': 'quality_check', 'production_channel_id': channel['id'], 'script': script, 'hook': hook,
             'failure_reason': None, 'updated_at': stamp,
         }, 'return=minimal')
         project = one(f"/rest/v1/video_projects?id=eq.{project['id']}&select=*&limit=1")
@@ -120,13 +145,27 @@ def main():
     obj = f"{uid}/{project['id']}/blackstar-s01e01-master.mp4"
     stored = upload(obj)
     media_url = stored.get('url') or obj
+    backend = 'b2' if stored.get('backend') == 'b2' else ('r2' if stored.get('key') else 'supabase')
+    bucket = stored.get('bucket') or (os.environ.get('R2_BUCKET') if backend == 'r2' else os.environ.get('B2_BUCKET') if backend == 'b2' else 'video-outputs')
+    req('POST', '/rest/v1/media_objects', {
+        'user_id': uid,
+        'production_channel_id': channel['id'],
+        'project_id': project['id'],
+        'render_job_id': None,
+        'backend': backend,
+        'bucket': bucket,
+        'object_key': stored.get('key') or obj,
+        'bytes': int(stored.get('bytes') or MASTER.stat().st_size),
+        'media_class': 'final',
+        'protected': True,
+    }, 'return=minimal')
     req('PATCH', f"/rest/v1/video_projects?id=eq.{project['id']}", {'output_url': media_url, 'updated_at': stamp}, 'return=minimal')
     project['output_url'] = media_url
 
     render = one(f"/rest/v1/render_jobs?project_id=eq.{project['id']}&engine=eq.github-actions-blender-eevee-piper&select=*&limit=1")
     if not render:
         rows = req('POST', '/rest/v1/render_jobs', {
-            'user_id': uid, 'project_id': project['id'], 'engine': 'github-actions-blender-eevee-piper',
+            'user_id': uid, 'project_id': project['id'], 'production_channel_id': channel['id'], 'engine': 'github-actions-blender-eevee-piper',
             'status': 'completed', 'output_url': media_url, 'media_duration_seconds': float(ep['target_duration_seconds']),
             'started_at': stamp, 'completed_at': stamp, 'updated_at': stamp,
         }, 'return=representation') or []
