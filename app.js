@@ -21,7 +21,7 @@ async function refreshData(){if(!currentUser)return;connectionBadge.textContent=
 
 async function applySession(session){currentUser=session?.user||null;authPanel.classList.toggle('hidden',!!currentUser);appContent.classList.toggle('hidden',!currentUser);signOutBtn.classList.toggle('hidden',!currentUser);if(currentUser)await refreshData();else connectionBadge.textContent='Supabase ready';}
 
-$('googleSignInBtn').addEventListener('click',async()=>{ $('authMessage').textContent='Opening Google sign-in…';const {error}=await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin}});if(error)$('authMessage').textContent=error.message;});
+$('googleSignInBtn').addEventListener('click',async()=>{ $('authMessage').textContent='Opening Google sign-in…';try{const {data,error}=await supabase.auth.signInWithOAuth({provider:'google'});if(error){$('authMessage').textContent=`Google sign-in failed: ${error.message}`;console.error('Google OAuth error',error);return;}if(data?.url)window.location.assign(data.url);}catch(error){$('authMessage').textContent=`Google sign-in failed: ${error?.message||'Unknown error'}`;console.error('Google OAuth exception',error);}});
 $('authForm').addEventListener('submit',async e=>{e.preventDefault();$('authMessage').textContent='Sending secure link…';const email=$('emailInput').value.trim();const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}});$('authMessage').textContent=error?error.message:'Check your email for the newest sign-in link.';});
 signOutBtn.addEventListener('click',async()=>{await supabase.auth.signOut();});
 
