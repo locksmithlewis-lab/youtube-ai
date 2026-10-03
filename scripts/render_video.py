@@ -52,10 +52,15 @@ def request(method, path, data=None, extra=None):
 
 
 def patch(table, item_id, payload):
+    if OFFLINE_MODE:
+        return None
     return request('PATCH', f'/rest/v1/{table}?id=eq.{item_id}', payload, {'Prefer': 'return=minimal'})
 
 
 def set_step(project, step, status, detail):
+    if OFFLINE_MODE:
+        print(f'OFFLINE_STEP {step}={status}: {detail}')
+        return None
     return request('POST', '/rest/v1/rpc/upsert_project_pipeline_step', {
         'p_user_id': project['user_id'],
         'p_project_id': project['id'],
