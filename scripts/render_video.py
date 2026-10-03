@@ -370,6 +370,66 @@ def scene_lengths(total, count, longform=False):
     return [weight * scale for weight in weights]
 
 
+
+def render_blender_full(project, job, audio, dur, work):
+    """Render a complete 16:9 animated Blender video, not a preview or placeholder."""
+    if dur < 45:
+        raise RuntimeError('Blender full-video mode requires at least 45 seconds of narration.')
+    if dur > 180:
+        raise RuntimeError('Blender full-video mode is capped at 180 seconds per cloud render for predictable CPU runtime.')
+    sentences_for_scenes = sentences(project.get('script') or '')
+    if not sentences_for_scenes:
+        raise RuntimeError('Blender full-video mode needs a non-empty script.')
+    scene_count = max(6, min(24, math.ceil(dur / 8.0)))
+    lengths = scene_lengths(dur, scene_count, True)
+    scenes = []
+    cursor = 0.0
+    domain = str(project.get('style') or '').lower()
+    if 'gaming' in domain: kind='gaming'
+    elif 'science' in domain: kind='science'
+    elif 'technology' in domain or 'tech' in domain: kind='technology'
+    elif 'data' in domain or 'news' in domain or 'documentary' in domain: kind='data'
+    else: kind='general'
+    for i, length in enumerate(lengths):
+        line = sentences_for_scenes[min(len(sentences_for_scenes)-1, math.floor(i*len(sentences_for_scenes)/scene_count))]
+        scenes.append({'index':i,'start':round(cursor,3),'end':round(min(dur,cursor+length),3),'kind':kind,'caption':line})
+        cursor += length
+    manifest = work / 'blender-manifest.json'
+    manifest.write_text(json.dumps({
+        'topic': project.get('topic') or project.get('title') or '',
+        'duration': dur, 'width': 1280, 'height': 720, 'fps': 6,
+        'scenes': scenes,
+    }, indent=2), encoding='utf-8')
+    visual = work / 'blender-visual.mp4'
+    set_step(project, 'visuals', 'running', f'Rendering {scene_count} animated 3D Blender scenes at 6 fps and normalizing to 24 fps for the finished 16:9 video.')
+    run(['blender','--background','--factory-startup','--python','scripts/blender_full_video.py','--',str(manifest),str(visual)],
+        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    if not visual.exists() or visual.stat().st_size < 500000:
+        raise RuntimeError('Blender completed without producing a valid full-video MP4.')
+    captions = work / 'captions.srt'
+    words = (project.get('script') or '').split()
+    chunk_size = 5
+    chunks = [' '.join(words[i:i+chunk_size]) for i in range(0,len(words),chunk_size)]
+    weights = [max(1,len(re.sub(r'\W','',chunk))) for chunk in chunks] or [1]
+    total=sum(weights); cur=0.0; lines=[]
+    for i,(chunk,weight) in enumerate(zip(chunks,weights),1):
+        start=cur; cur += dur*weight/total
+        lines += [str(i),f'{ts(start)} --> {ts(dur if i==len(chunks) else cur)}',chunk,'']
+    captions.write_text('\n'.join(lines),encoding='utf-8')
+    out=work/'output.mp4'
+    vf="scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24,subtitles="+str(captions).replace('\\','/')+":force_style='FontName=DejaVu Sans,FontSize=22,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&HC0000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginL=190,MarginR=190,MarginV=80'"
+    run(['ffmpeg','-y','-i',str(visual),'-i',str(audio),'-vf',vf,'-map','0:v','-map','1:a','-c:v','libx264','-preset','veryfast','-crf','21','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart','-shortest',str(out)],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    healthy, integrity = is_healthy(out, black_limit=.75, freeze_limit=2.0)
+    if not healthy:
+        raise RuntimeError(f'Blender finished-video integrity failed: black={integrity["max_black_seconds"]:.2f}s freeze={integrity["max_freeze_seconds"]:.2f}s')
+    final_dur=duration(out)
+    if final_dur < dur*.94:
+        raise RuntimeError(f'Blender output is truncated: {final_dur:.2f}s vs narration {dur:.2f}s')
+    set_step(project, 'visuals', 'passed', f'Blender rendered {scene_count} real animated 3D scenes; finished video is {final_dur:.1f}s at 1920x1080/24fps.')
+    set_step(project, 'edit', 'passed', 'Blender scenes were assembled with captions, narration and 16:9 H.264 output.')
+    return out
+
 job = claim()
 if not job:
     print('No queued render jobs.')
@@ -399,6 +459,11 @@ try:
 
     audio = expressive_voice(script, work, model, longform)
     dur = duration(audio)
+    if str(project.get('style') or '').lower().startswith('blender'):
+        out = render_blender_full(project, job, audio, dur, work)
+        obj = f"{job['user_id']}/{job['project_id']}/{job['id']}.mp4"
+        print(f"Rendered {obj}:")
+        raise SystemExit(0)
     sentence_list = sentences(script)
     scene_count = max(28, min(180, math.ceil(dur / 5.0))) if longform else max(10, min(24, math.ceil(dur / 2.8)))
     segs = scene_lengths(dur, scene_count, longform)
