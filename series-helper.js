@@ -9,12 +9,12 @@ if(studio){
   const panel=document.createElement('section'); panel.className='panel series-panel';
   panel.innerHTML=`<div class="section-head"><div><div class="eyebrow">SERIES ENGINE</div><h3>Documentary series</h3><p class="muted small">Build a recurring cast of up to 50 characters. Rolixa keeps their names, roles, appearance, personality, relationships and continuity in the story bible instead of replacing them every episode.</p></div></div>
   <form id="seriesForm" class="series-grid">
-    <label class="wide">Series title<input id="seriesTitle" required maxlength="120" placeholder="Example: Neon Harbor" /></label>
+    <label class="wide">Series title<input id="seriesTitle" required maxlength="120" /></label>
     <label>Type<select id="seriesType"><option value="documentary">Documentary series</option></select></label>
     <label>Episode length<input id="seriesLength" type="number" min="20" max="3600" value="60" /><span class="input-help">Seconds</span></label>
-    <label class="wide">Premise / world<textarea id="seriesPremise" required maxlength="1200" placeholder="Who is this about? What world are we in? What conflict or subject keeps the series moving?"></textarea></label>
-    <label class="wide">Characters — up to 50, one per line<textarea id="seriesCharacters" rows="10" maxlength="10000" placeholder="Mara | lead detective | 28, curly black hair, green coat | observant, dry humor | trusts Jax\nJax | pilot | 31, shaved head, flight jacket | bold, loyal | Mara's oldest friend"></textarea><span class="input-help">Format: Name | role | appearance | personality | relationships. Name-only lines also work.</span></label>
-    <label class="wide" id="factsWrap" style="display:none">Verified documentary facts (one per line)<textarea id="seriesFacts" placeholder="Only facts you are comfortable treating as verified. Documentary auto-generation pauses if this is empty."></textarea></label>
+    <label class="wide">Premise / world<textarea id="seriesPremise" required maxlength="1200"></textarea></label>
+    <label class="wide">Characters — up to 50, one per line<textarea id="seriesCharacters" rows="10" maxlength="10000"></textarea><span class="input-help">Format: Name | role | appearance | personality | relationships. Name-only lines also work.</span></label>
+    <label class="wide" id="factsWrap" style="display:none">Verified documentary facts (one per line)<textarea id="seriesFacts"></textarea></label>
     <label>Cadence<select id="seriesCadence"><option value="daily">New episode every day</option><option value="manual">Manual only</option></select></label>
     <div style="align-self:end"><button class="primary" type="submit">Create series</button></div>
   </form><p id="seriesMessage" class="status-line"></p><div id="seriesList" class="series-list"></div>`;
