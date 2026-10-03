@@ -49,7 +49,11 @@ def main():
             "status":"ready","output_url":url,"creative_score":90,"quality_score":90,
             "qc_attempts":1,"publication_priority":100,"failure_reason":None
         }
-        existing=sb(f"video_projects?id=eq.{project_id}&select=id")
+        existing=sb(f"video_projects?id=eq.{project_id}&select=id,status")
+        if existing and existing[0].get("status")=="posted":
+            print(f"ALREADY_POSTED {job_id} -> {project_id}")
+            registered.append(project_id)
+            continue
         if existing:
             sb(f"video_projects?id=eq.{project_id}", "PATCH", {k:v for k,v in payload.items() if k not in ("id","user_id","production_channel_id")})
         else:
