@@ -35,12 +35,12 @@ jobs:
           for r in runs:
               if r["workflowName"] not in watched:
                   continue
-              if r["status"] not in {"queued","pending","in_progress"}:
+              if r["status"] not in {"queued","pending"}:
                   continue
               created=r.get("createdAt")
               if not created:
                   continue
-              # Give GitHub 15 minutes to assign/start a runner.
+              # Give GitHub 15 minutes to assign/start a runner; never interrupt an already-running render.
               age=now-time.mktime(time.strptime(created[:19], "%Y-%m-%dT%H:%M:%S"))
               if age > 900:
                   stale.append(r)
