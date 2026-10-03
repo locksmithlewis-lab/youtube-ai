@@ -58,7 +58,7 @@ def main():
         sb(f"project_pipeline_steps?project_id=eq.{project_id}&step=eq.final_video_qc","DELETE")
         sb("project_pipeline_steps","POST",{
             "project_id":project_id,"user_id":channel["user_id"],"step":"final_video_qc",
-            "status":"passed","message":"Offline renderer completed final MP4 integrity/duration checks; external R2 object verified."
+            "status":"passed","detail":"Offline renderer completed final MP4 integrity/duration checks; external R2 object verified."
         })
         registered.append(project_id)
         print(f"REGISTERED {job_id} -> {project_id} -> {url}")
