@@ -90,6 +90,14 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --quiet boto3
+          RESPONSE="$(curl -fsS -X POST https://oauth2.googleapis.com/token \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "client_id=$GOOGLE_CLIENT_ID" \
+            --data-urlencode "client_secret=$GOOGLE_CLIENT_SECRET" \
+            --data-urlencode "refresh_token=$YOUTUBE_REFRESH_TOKEN" \
+            --data-urlencode "grant_type=refresh_token")"
+          export YOUTUBE_ACCESS_TOKEN="$(python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' <<<"$RESPONSE")"
+          echo "::add-mask::$YOUTUBE_ACCESS_TOKEN"
           node scripts/publish_offline_direct.js
 
       - name: Optional Supabase status registration (non-blocking)
