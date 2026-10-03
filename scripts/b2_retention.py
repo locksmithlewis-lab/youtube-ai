@@ -7,6 +7,9 @@ from b2_storage import configured, delete_keys
 days = max(1, int(os.environ.get("ROLIXA_B2_RETENTION_DAYS", "2")))
 dry = os.environ.get("ROLIXA_B2_RETENTION_DRY_RUN", "0") == "1"
 
+if os.environ.get("ROLIXA_ALLOW_B2_MEDIA", "0").strip() != "1":
+    print("B2 media fallback is disabled; retention skipped.")
+    raise SystemExit(0)
 if not configured():
     print("B2 not configured; retention skipped.")
     raise SystemExit(0)
