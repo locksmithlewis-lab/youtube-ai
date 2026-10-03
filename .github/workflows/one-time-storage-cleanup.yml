@@ -23,7 +23,7 @@ jobs:
 
           npm init -y >/dev/null 2>&1
           npm install --silent @supabase/supabase-js
-          cat > /tmp/cleanup.mjs <<'JS'
+          cat > cleanup.mjs <<'JS'
           import { createClient } from "@supabase/supabase-js";
           const url = process.env.SUPABASE_URL;
           const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -68,4 +68,4 @@ jobs:
 
           console.log("Cleanup complete.");
           JS
-          node /tmp/cleanup.mjs
+          node cleanup.mjs
