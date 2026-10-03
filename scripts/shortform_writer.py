@@ -1,3 +1,4 @@
+import html
 import json
 import re
 import urllib.parse
@@ -78,6 +79,30 @@ def needs_script(project):
         or weak_hook
         or not _readability_ok(script)
     )
+
+
+def _source_from_url(source):
+    url=str(source.get('url') or '').strip()
+    if not url.startswith(('https://','http://')):
+        raise RuntimeError('Verified source has no public HTTP URL.')
+    req=urllib.request.Request(url,headers={'User-Agent':USER_AGENT,'Accept':'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5'})
+    with urllib.request.urlopen(req,timeout=30) as response:
+        content_type=str(response.headers.get('Content-Type') or '').lower()
+        if 'pdf' in content_type or not any(x in content_type for x in ('text/html','application/xhtml')):
+            raise RuntimeError('Preferred source is not an HTML page that this free parser can read.')
+        raw=response.read(2_000_000).decode('utf-8',errors='replace')
+    title_match=re.search(r'(?is)<title[^>]*>(.*?)</title>',raw)
+    page_title=html.unescape(re.sub(r'<[^>]+>',' ',title_match.group(1))).strip() if title_match else str(source.get('title') or url)
+    raw=re.sub(r'(?is)<(script|style|noscript|svg|nav|footer|header|aside)[^>]*>.*?</\\1>',' ',raw)
+    raw=re.sub(r'(?i)</(p|div|li|h[1-6]|article|section|br|tr)>','\\n',raw)
+    text=html.unescape(re.sub(r'<[^>]+>',' ',raw))
+    lines=[re.sub(r'\\s+',' ',line).strip() for line in text.splitlines()]
+    lines=[line for line in lines if len(_words(line))>=6]
+    extract=' '.join(lines)
+    extract=re.sub(r'\\s+',' ',extract).strip()
+    if len(_words(extract))<55:
+        raise RuntimeError('Preferred source page did not yield enough readable text.')
+    return {'title':str(source.get('title') or page_title),'url':url,'extract':extract[:6500]}
 
 
 def _source(topic):
@@ -215,13 +240,24 @@ def _write_fiction(project,topic):
     }
 
 
-def write(project):
+def write(project, preferred_sources=None):
     topic=str(project.get('topic') or project.get('title') or '').strip()
     if len(_words(topic))<2:
         raise RuntimeError('Short topic is too vague to write automatically.')
     if _is_fictional(project):
         return _write_fiction(project,topic)
-    source=_source(topic)
+    source=None
+    # Use the project's explicitly attached verified reference before searching a broad topic query.
+    for preferred in (preferred_sources or []):
+        if not preferred.get('verified') or not preferred.get('url'):
+            continue
+        try:
+            source=_source_from_url(preferred)
+            break
+        except Exception:
+            continue
+    if source is None:
+        source=_source(topic)
     source_sentences=_sentences(source['extract'])
     hook=_make_hook(project,topic)
     closing=f'That is why {" ".join(_words(topic)[:7])} matters more than the headline suggests.'
