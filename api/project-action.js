@@ -3,7 +3,7 @@ const PUB=process.env.SUPABASE_PUBLISHABLE_KEY||process.env.SUPABASE_ANON_KEY||'
 
 async function getUser(token){const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{headers:{apikey:PUB,Authorization:`Bearer ${token}`}});return r.ok?r.json():null;}
 async function sb(path,opt={},key){const r=await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{...opt,headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json',...(opt.headers||{})}});const text=await r.text();if(!r.ok)throw new Error(`Database request failed (${r.status})${text?`: ${text.slice(0,240)}`:''}`);return text?JSON.parse(text):null;}
-async function removeObject(path,key){if(!path)return;const encoded=String(path).split('/').map(encodeURIComponent).join('/');const r=await fetch(`${SUPABASE_URL}/storage/v1/object/video-outputs/${encoded}`,{method:'DELETE',headers:{apikey:key,Authorization:`Bearer ${key}`}});if(!r.ok&&r.status!==404){const t=await r.text().catch(()=> '');throw new Error(`Could not delete rendered file (${r.status})${t?`: ${t.slice(0,180)}`:''}`);}}
+async function removeObject(path,key){if(!path)return;if(/^https?:\/\//i.test(String(path)))return;const encoded=String(path).split('/').map(encodeURIComponent).join('/');const r=await fetch(`${SUPABASE_URL}/storage/v1/object/video-outputs/${encoded}`,{method:'DELETE',headers:{apikey:key,Authorization:`Bearer ${key}`}});if(!r.ok&&r.status!==404){const t=await r.text().catch(()=> '');throw new Error(`Could not delete legacy Supabase rendered file (${r.status})${t?`: ${t.slice(0,180)}`:''}`);}}
 async function deleteProject(project,userId,serviceKey){const id=project.id;const jobs=await sb(`render_jobs?project_id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc`,{},serviceKey)||[];if(jobs.some(j=>j.status==='running'))return {ok:false,id,reason:'active render'};const objects=new Set([project.output_url,...jobs.map(j=>j.output_url)].filter(Boolean));for(const path of objects)await removeObject(path,serviceKey);await sb(`video_projects?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(userId)}`,{method:'DELETE',headers:{Prefer:'return=minimal'}},serviceKey);return {ok:true,id};}
 
 module.exports=async function handler(req,res){
@@ -32,6 +32,6 @@ module.exports=async function handler(req,res){
   }
   if(jobs.some(j=>j.status==='running'))return res.status(409).json({error:'Cancel the active render first, then delete the project after it stops.'});
   const result=await deleteProject(project,user.id,serviceKey);if(!result.ok)return res.status(409).json({error:result.reason});
-  return res.status(200).json({ok:true,message:'Project and stored render deleted permanently.'});
+  return res.status(200).json({ok:true,message:'Project deleted. Externally stored media is reclaimed by the media-retention worker.'});
  }catch(e){return res.status(500).json({error:e.message||'Project action failed.'});}
 };
