@@ -46,6 +46,10 @@ jobs:
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_S3_ENDPOINT: https://uqmnpeovwfzizajheuig.storage.supabase.co/storage/v1/s3
+          SUPABASE_S3_ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID }}
+          SUPABASE_S3_SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET_ACCESS_KEY }}
+          SUPABASE_S3_REGION: ${{ secrets.SUPABASE_S3_REGION }}
         run: |
           set +e
           code=$(curl -sS -o /tmp/supabase-check.json -w "%{http_code}" \
@@ -53,9 +57,17 @@ jobs:
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             "$SUPABASE_URL/rest/v1/video_projects?select=id&limit=1")
           if [ "$code" = "402" ]; then
-            echo "::notice::Supabase storage restriction detected; removing legacy video-outputs media through the Storage API."
-            npm install --silent --no-save @supabase/supabase-js
-            node scripts/cleanup_supabase_legacy_media.mjs
+            echo "::notice::Supabase storage restriction detected; emptying legacy video-outputs through Supabase's S3 interface."
+            python -m pip install --quiet awscli
+            export AWS_DEFAULT_REGION="$SUPABASE_S3_REGION"
+            export AWS_ACCESS_KEY_ID="$SUPABASE_S3_ACCESS_KEY_ID"
+            export AWS_SECRET_ACCESS_KEY="$SUPABASE_S3_SECRET_ACCESS_KEY"
+            aws s3 rm "s3://video-outputs" --recursive --endpoint-url "$SUPABASE_S3_ENDPOINT"
+            remaining=$(aws s3 ls "s3://video-outputs" --recursive --endpoint-url "$SUPABASE_S3_ENDPOINT" | wc -l)
+            if [ "$remaining" -ne 0 ]; then
+              echo "::error::Legacy video-outputs bucket still contains $remaining objects after cleanup."
+              exit 1
+            fi
             code=$(curl -sS -o /tmp/supabase-check.json -w "%{http_code}" \
               -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
