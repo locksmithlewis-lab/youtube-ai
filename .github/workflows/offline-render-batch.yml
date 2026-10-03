@@ -41,13 +41,8 @@ jobs:
 
   render:
     needs: media-preflight
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix:
-        worker: [1, 2, 3, 4, 5]
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v5
       - name: Install renderer
@@ -55,11 +50,10 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
           python -m pip install --quiet boto3 piper-tts==1.6.0
-      - name: Render batch member
+      - name: Render five normal videos sequentially
         env:
           ROLIXA_OFFLINE_MODE: '1'
           ROLIXA_OFFLINE_BATCH: config/offline_render_batch.json
-          ROLIXA_WORKER: ${{ matrix.worker }}
           PYTHONPATH: scripts
           PIPER_VOICE_DIR: .piper-voices
           ROLIXA_VISUAL_CACHE: .rolixa-cache
@@ -72,4 +66,11 @@ jobs:
           GENERATIVE_VIDEO_ENABLED: '0'
           GENERATIVE_VIDEO_PERCENT: '0'
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-        run: python scripts/render_with_metrics.py
+        run: |
+          set -euo pipefail
+          for worker in 1 2 3 4 5; do
+            echo "::group::Rendering batch member $worker of 5"
+            export ROLIXA_WORKER="$worker"
+            python scripts/render_with_metrics.py
+            echo "::endgroup::"
+          done
