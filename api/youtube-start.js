@@ -166,12 +166,27 @@ module.exports = async function handler(req, res) {
 
   // GitHub Actions publisher path: exchange the server-stored YouTube credential for a short-lived access token.
   if (req.headers['x-rolixa-github-publisher'] === '1') {
-    const gh = req.headers.authorization || '';
-    if (!gh.startsWith('Bearer ')) return res.status(401).json({ error: 'GitHub authorization required.' });
-    const check = await fetch('https://api.github.com/repos/locksmithlewis-lab/youtube-ai', {
-      headers: { Authorization: gh, Accept: 'application/vnd.github+json', 'User-Agent': 'rolixa-publisher' }
-    });
-    if (!check.ok) return res.status(401).json({ error: 'GitHub Actions authorization was rejected.' });
+    const oidc = req.headers.authorization || '';
+    if (!oidc.startsWith('Bearer ')) return res.status(401).json({ error: 'GitHub OIDC authorization required.' });
+    const jwt = oidc.slice(7);
+    const parts = jwt.split('.');
+    if (parts.length !== 3) return res.status(401).json({ error: 'Invalid GitHub OIDC token.' });
+    const decode = value => JSON.parse(Buffer.from(value.replace(/-/g,'+').replace(/_/g,'/'), 'base64').toString('utf8'));
+    let header, claims;
+    try { header = decode(parts[0]); claims = decode(parts[1]); } catch { return res.status(401).json({ error: 'Invalid GitHub OIDC token.' }); }
+    if (claims.iss !== 'https://token.actions.githubusercontent.com' || claims.aud !== 'rolixa-youtube-publisher' ||
+        claims.repository !== 'locksmithlewis-lab/youtube-ai' || claims.ref !== 'refs/heads/main' ||
+        claims.workflow !== 'Publish Existing R2 Batch' || Number(claims.exp || 0) < Math.floor(Date.now()/1000)) {
+      return res.status(403).json({ error: 'GitHub workflow identity is not authorized.' });
+    }
+    const jwksResp = await fetch('https://token.actions.githubusercontent.com/.well-known/jwks');
+    if (!jwksResp.ok) return res.status(502).json({ error: 'Could not load GitHub OIDC keys.' });
+    const jwks = await jwksResp.json();
+    const jwk = (jwks.keys || []).find(k => k.kid === header.kid);
+    if (!jwk?.x5c?.[0]) return res.status(401).json({ error: 'GitHub OIDC signing key not recognized.' });
+    const cert = '-----BEGIN CERTIFICATE-----\\n' + jwk.x5c[0].match(/.{1,64}/g).join('\\n') + '\\n-----END CERTIFICATE-----';
+    const verified = crypto.verify('RSA-SHA256', Buffer.from(parts[0]+'.'+parts[1]), crypto.createPublicKey(cert), Buffer.from(parts[2].replace(/-/g,'+').replace(/_/g,'/'), 'base64'));
+    if (!verified) return res.status(401).json({ error: 'GitHub OIDC signature verification failed.' });
 
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const tokenSecret = process.env.YOUTUBE_TOKEN_ENCRYPTION_KEY;
