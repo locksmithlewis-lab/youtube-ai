@@ -7,6 +7,14 @@ on:
     paths:
       - 'scripts/render_video.py'
       - 'scripts/render_with_metrics.py'
+      - 'scripts/shortform_writer.py'
+      - 'scripts/longform_writer.py'
+      - 'scripts/visual_sources.py'
+      - 'scripts/storage_upload.py'
+      - 'scripts/r2_storage.py'
+      - 'scripts/b2_storage.py'
+      - 'scripts/production_guard.py'
+      - 'scripts/media_integrity.py'
       - 'scripts/engagement_overlay.py'
       - '.github/workflows/render-video.yml'
   schedule:
