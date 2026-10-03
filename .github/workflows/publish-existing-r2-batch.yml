@@ -1,0 +1,39 @@
+name: Publish Existing R2 Batch
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offline-direct-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install R2 client
+        run: python -m pip install --quiet boto3
+      - name: Publish already-rendered videos and verify public status
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          ROLIXA_OFFLINE_BATCH: config/offline_render_batch.json
+        run: node scripts/publish_offline_direct.js
+      - name: Save verified publication report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-publish-results
+          path: offline-publish-results.json
+          if-no-files-found: error
+          retention-days: 30
