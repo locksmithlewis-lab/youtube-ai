@@ -50,7 +50,7 @@ jobs:
           SUPABASE_S3_ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID }}
           SUPABASE_S3_SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET_ACCESS_KEY }}
           SUPABASE_S3_REGION: ${{ secrets.SUPABASE_S3_REGION }}
-          ROLIXA_OFFLINE_MODE: '1'
+          ROLIXA_OFFLINE_MODE: ${{ github.sha == '499e32618d376784354bebd22df4dd222e4e1ce2' }}
         run: |
           set +e
           if [ "$ROLIXA_OFFLINE_MODE" = "1" ]; then
