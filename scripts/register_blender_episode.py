@@ -176,6 +176,12 @@ def main():
             'completed_at': stamp, 'updated_at': stamp, 'error': None,
         }, 'return=minimal')
 
+    media_key = stored.get('key') or obj
+    media_query = '/rest/v1/media_objects?backend=eq.' + urllib.parse.quote(backend, safe='') + '&bucket=eq.' + urllib.parse.quote(bucket, safe='') + '&object_key=eq.' + urllib.parse.quote(media_key, safe='') + '&select=id&limit=1'
+    media_rows = req('GET', media_query) or []
+    if media_rows:
+        req('PATCH', f"/rest/v1/media_objects?id=eq.{media_rows[0]['id']}", {'render_job_id': render['id']}, 'return=minimal')
+
     req('DELETE', f"/rest/v1/visual_assets?project_id=eq.{project['id']}&provider=eq.blender-native", None, 'return=minimal')
     assets = []
     for seg in m['segments']:
