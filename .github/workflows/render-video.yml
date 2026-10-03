@@ -53,7 +53,7 @@ jobs:
           ROLIXA_OFFLINE_MODE: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[offline-render]') }}
         run: |
           set +e
-          if [ "$ROLIXA_OFFLINE_MODE" = "1" ]; then
+          if [ "$ROLIXA_OFFLINE_MODE" = "true" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
             echo "has_jobs=true" >> "$GITHUB_OUTPUT"
             echo "::notice::Offline render mode enabled: renderer does not require Supabase."
@@ -186,3 +186,5 @@ jobs:
 # Offline external-media batch kick
 
 # explicit offline batch kick
+
+# [offline-render] kick after boolean fix
