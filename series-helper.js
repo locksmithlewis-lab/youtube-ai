@@ -38,12 +38,12 @@ if(studio){
   document.getElementById('seriesForm').addEventListener('submit',async e=>{
     e.preventDefault(); const msg=document.getElementById('seriesMessage'); msg.textContent='Creating series…';
     const {data:{user}}=await supabase.auth.getUser(); if(!user){msg.textContent='Sign in first.';return;}
-    const seriesType='documentary'; const chars=parseCharacters(document.getElementById('seriesCharacters').value);
+    const seriesType='documentary'; const chars=parseCharacters(document.getElementById('seriesCharacters').value); const channelSelect=document.getElementById('channelInput'); const productionChannelId=channelSelect?.value||''; if(!productionChannelId){msg.textContent='Select a connected production channel before creating a series.';return;}
     if(chars.length>50){msg.textContent='Maximum 50 characters.';return;}
     const factLines=document.getElementById('seriesFacts').value.split('\n').map(x=>x.trim()).filter(Boolean); if(!factLines.length){msg.textContent='Add at least one verified fact before creating a documentary series.';return;}
     const story_bible={characters:chars,verified_facts:factLines.map(fact=>({fact})),cast_rules:{max_characters:50,preserve_identity:true,preserve_appearance:true,preserve_relationships:true,allow_character_growth:true},rules:{never_repeat_episode:true,continue_open_loops:true,original_chapters_only:true,maintain_character_continuity:true}};
     const cadence=document.getElementById('seriesCadence').value;
-    const {error}=await supabase.from('series_projects').insert({user_id:user.id,title:document.getElementById('seriesTitle').value.trim(),series_type:seriesType,premise:document.getElementById('seriesPremise').value.trim(),style:seriesType==='documentary'?'Documentary':'Animated cinematic',episode_length_seconds:Number(document.getElementById('seriesLength').value)||60,cadence,status:'active',story_bible,next_run_at:cadence==='daily'?new Date().toISOString():null});
+    const {error}=await supabase.from('series_projects').insert({user_id:user.id,production_channel_id:productionChannelId,title:document.getElementById('seriesTitle').value.trim(),series_type:seriesType,premise:document.getElementById('seriesPremise').value.trim(),style:seriesType==='documentary'?'Documentary':'Animated cinematic',episode_length_seconds:Number(document.getElementById('seriesLength').value)||60,cadence,status:'active',story_bible,next_run_at:cadence==='daily'?new Date().toISOString():null});
     if(error){msg.textContent=error.message;return;}
     msg.textContent=cadence==='daily'?`Series created with ${chars.length} recurring characters. Episode 1 will be generated at the next due-series check.`:`Series created with ${chars.length} recurring characters in manual mode.`;
     e.target.reset(); document.getElementById('seriesLength').value='60'; factsWrap.style.display='none'; await loadSeries();
