@@ -37,6 +37,7 @@ jobs:
     timeout-minutes: 3
     outputs:
       available: ${{ steps.backend.outputs.available }}
+      has_jobs: ${{ steps.backend.outputs.has_jobs }}
     steps:
       - name: Check Supabase backend availability
         id: backend
@@ -49,22 +50,36 @@ jobs:
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             "$SUPABASE_URL/rest/v1/video_projects?select=id&limit=1")
-          if [ "$code" = "200" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-            echo "Supabase REST is available; rendering may proceed."
-          else
+          if [ "$code" != "200" ]; then
             echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "has_jobs=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Supabase unavailable/restricted (HTTP $code). Render fleet skipped."
+            exit 0
+          fi
+          echo "available=true" >> "$GITHUB_OUTPUT"
+          queue_code=$(curl -sS -o /tmp/rolixa-queue.json -w "%{http_code}" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            "$SUPABASE_URL/rest/v1/render_jobs?status=eq.queued&select=id&limit=1")
+          if [ "$queue_code" != "200" ]; then
+            echo "has_jobs=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Could not inspect the render queue (HTTP $queue_code); skipping workers safely."
+          elif grep -qE '^\\[\\s*\\]' /tmp/rolixa-queue.json; then
+            echo "has_jobs=false" >> "$GITHUB_OUTPUT"
+            echo "Queue is empty; no renderer workers will start."
+          else
+            echo "has_jobs=true" >> "$GITHUB_OUTPUT"
+            echo "Queued render found; starting one free-mode worker."
           fi
 
   render:
     needs: preflight
-    if: needs.preflight.outputs.available == 'true' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    if: needs.preflight.outputs.available == 'true' && needs.preflight.outputs.has_jobs == 'true' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     strategy:
       fail-fast: false
-      max-parallel: 12
+      max-parallel: 1
       matrix:
-        worker: [1,2,3,4,5,6,7,8,9,10,11,12]
+        worker: [1]
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
