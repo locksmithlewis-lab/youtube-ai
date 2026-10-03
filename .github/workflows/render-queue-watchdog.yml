@@ -47,5 +47,21 @@ jobs:
           for r in stale:
               print(f"Cancelling stale {r['workflowName']} #{r['databaseId']}")
               subprocess.run(["gh","run","cancel",str(r["databaseId"]),"-R",repo],check=False)
+
+          # If the offline batch has no active run after cleanup, restart only when
+          # the queue definition has not yet been successfully processed.
+          active=[r for r in runs if r["workflowName"]=="Offline Render Batch"
+                  and r["status"] in {"queued","pending","in_progress"}]
+          latest_queue=subprocess.check_output(
+              ["gh","api",f"repos/{repo}/contents/config/offline_render_batch.json",
+               "--jq",".sha"],text=True).strip()
+          completed=subprocess.check_output(
+              ["gh","run","list","-R",repo,"-w","Offline Render Batch","--status","success",
+               "--limit","20","--json","headSha"],text=True)
+          successful={x["headSha"] for x in json.loads(completed)}
+          if not active and latest_queue not in successful:
+              print("No active Offline Render Batch has successfully processed the current queue definition; dispatching a recovery run.")
+              subprocess.run(["gh","workflow","run","Offline Render Batch","-R",repo,"--ref","main"],check=False)
+
           print(f"Watchdog inspected {len(runs)} runs; cancelled {len(stale)} stale render runs.")
           PY
