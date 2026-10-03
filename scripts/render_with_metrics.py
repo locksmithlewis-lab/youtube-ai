@@ -243,5 +243,7 @@ if render.returncode: raise SystemExit(render.returncode)
 matches=re.findall(r'Rendered\s+([^/\s]+/([^/\s]+)/([^/:\s]+)\.mp4):',text)
 if not matches: raise SystemExit(0)
 obj,project_id,job_id=matches[-1]
-ensure_cta(obj, project_id, job_id)
+project_for_cta = (req('GET', f'/rest/v1/video_projects?id=eq.{project_id}&select=style') or [{}])[0]
+if not str(project_for_cta.get('style') or '').lower().startswith('blender'):
+    ensure_cta(obj, project_id, job_id)
 post_render_qc(project_id,job_id,obj)
