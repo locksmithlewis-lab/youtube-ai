@@ -9,7 +9,7 @@ from pathlib import Path
 FREE_STORAGE_GB = float(os.environ.get("ROLIXA_R2_FREE_STORAGE_GB", "10"))
 MAX_STORAGE_BYTES = int(os.environ.get(
     "ROLIXA_R2_MAX_STORAGE_BYTES",
-    str(int(FREE_STORAGE_GB * 1_000_000_000 * 0.95)),
+    str(int(9.0 * 1_000_000_000)),
 ))
 PRESIGN_SECONDS = min(604800, int(os.environ.get("ROLIXA_R2_PRESIGN_SECONDS", "518400")))
 
