@@ -40,6 +40,7 @@ jobs:
       available: ${{ steps.backend.outputs.available }}
       has_jobs: ${{ steps.backend.outputs.has_jobs }}
     steps:
+      - uses: actions/checkout@v5
       - name: Check Supabase backend availability
         id: backend
         env:
