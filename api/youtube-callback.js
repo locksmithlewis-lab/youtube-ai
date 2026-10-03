@@ -116,7 +116,30 @@ module.exports = async function handler(req, res) {
 
   const scopeList = String(tokens.scope || '').split(' ').filter(Boolean);
   const expiresAt = new Date(Date.now() + Number(tokens.expires_in || 3600) * 1000).toISOString();
-  const existingRows = await supabaseRest(`youtube_oauth_tokens?user_id=eq.${stateData.uid}&select=refresh_token_ciphertext`, 'GET', null, serviceKey) || [];
+  const channelRows = await supabaseRest(
+    `production_channels?user_id=eq.${stateData.uid}&channel_id=eq.${encodeURIComponent(channel.id)}&select=*&limit=1`,
+    'GET', null, serviceKey
+  ) || [];
+  let productionChannel = channelRows[0] || null;
+  if (!productionChannel) {
+    const created = await supabaseRest('production_channels', 'POST', {
+      user_id: stateData.uid,
+      channel_id: channel.id,
+      channel_title: channel.snippet?.title || channel.id,
+      platform: 'youtube',
+      enabled: true,
+      publish_enabled: true,
+      storage_backend: 'r2',
+      storage_soft_limit_bytes: 9000000000,
+      retention_days: 30,
+    }, serviceKey);
+    productionChannel = Array.isArray(created) ? created[0] : created;
+  }
+
+  const existingRows = await supabaseRest(
+    `youtube_oauth_tokens?user_id=eq.${stateData.uid}&production_channel_id=eq.${productionChannel.id}&select=refresh_token_ciphertext&limit=1`,
+    'GET', null, serviceKey
+  ) || [];
   const refreshTokenCiphertext = tokens.refresh_token
     ? encrypt(tokens.refresh_token, tokenSecret)
     : existingRows[0]?.refresh_token_ciphertext;
@@ -126,6 +149,7 @@ module.exports = async function handler(req, res) {
 
   const tokenRecord = {
     user_id: stateData.uid,
+    production_channel_id: productionChannel.id,
     refresh_token_ciphertext: refreshTokenCiphertext,
     access_token_ciphertext: encrypt(tokens.access_token, tokenSecret),
     expires_at: expiresAt,
@@ -133,13 +157,13 @@ module.exports = async function handler(req, res) {
     updated_at: new Date().toISOString(),
   };
 
-  await supabaseRest('youtube_oauth_tokens?on_conflict=user_id', 'POST', tokenRecord, serviceKey);
-  await supabaseRest('youtube_connections?on_conflict=user_id', 'POST', {
+  await supabaseRest('youtube_oauth_tokens?on_conflict=production_channel_id', 'POST', tokenRecord, serviceKey);
+  await supabaseRest('youtube_connections?on_conflict=user_id,channel_id', 'POST', {
     user_id: stateData.uid,
     channel_id: channel.id,
     channel_title: channel.snippet?.title || null,
     scopes: scopeList,
-    credential_ref: `youtube_oauth_tokens:${stateData.uid}`,
+    credential_ref: `youtube_oauth_tokens:${productionChannel.id}`,
     connected_at: new Date().toISOString(),
     status: 'connected',
     updated_at: new Date().toISOString(),
