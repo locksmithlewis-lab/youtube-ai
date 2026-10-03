@@ -228,7 +228,7 @@ def _fit_video_bytes(data, limit=VIDEO_BUCKET_SOFT_LIMIT):
 
 
 def upload_bytes(data, supabase_url, key, bucket, obj, mime="application/octet-stream", upsert=True):
-    if bucket == "video-outputs":
+    if bucket in ("video-outputs", "video-thumbnails"):
         with tempfile.NamedTemporaryFile(suffix=Path(obj).suffix or '.bin', delete=False) as tmp:
             tmp.write(bytes(data)); tmp_path = Path(tmp.name)
         try:
