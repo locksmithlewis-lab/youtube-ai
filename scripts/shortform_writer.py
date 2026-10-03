@@ -93,13 +93,14 @@ def _source_from_url(source):
         raw=response.read(2_000_000).decode('utf-8',errors='replace')
     title_match=re.search(r'(?is)<title[^>]*>(.*?)</title>',raw)
     page_title=html.unescape(re.sub(r'<[^>]+>',' ',title_match.group(1))).strip() if title_match else str(source.get('title') or url)
-    raw=re.sub(r'(?is)<(script|style|noscript|svg|nav|footer|header|aside)[^>]*>.*?</\\1>',' ',raw)
-    raw=re.sub(r'(?i)</(p|div|li|h[1-6]|article|section|br|tr)>','\\n',raw)
+    for tag in ('script','style','noscript','svg','nav','footer','header','aside'):
+        raw=re.sub(r'(?is)<' + tag + r'\b[^>]*>.*?</' + tag + r'\s*>',' ',raw)
+    raw=re.sub(r'(?i)</(p|div|li|h[1-6]|article|section|br|tr)>','\n',raw)
     text=html.unescape(re.sub(r'<[^>]+>',' ',raw))
-    lines=[re.sub(r'\\s+',' ',line).strip() for line in text.splitlines()]
+    lines=[re.sub(r'\s+',' ',line).strip() for line in text.splitlines()]
     lines=[line for line in lines if len(_words(line))>=6]
     extract=' '.join(lines)
-    extract=re.sub(r'\\s+',' ',extract).strip()
+    extract=re.sub(r'\s+',' ',extract).strip()
     if len(_words(extract))<55:
         raise RuntimeError('Preferred source page did not yield enough readable text.')
     return {'title':str(source.get('title') or page_title),'url':url,'extract':extract[:6500]}
