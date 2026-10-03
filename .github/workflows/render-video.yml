@@ -64,7 +64,7 @@ jobs:
           if [ "$queue_code" != "200" ]; then
             echo "has_jobs=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Could not inspect the render queue (HTTP $queue_code); skipping workers safely."
-          elif grep -qE '^\\[\\s*\\]' /tmp/rolixa-queue.json; then
+          elif python -c 'import json,sys; sys.exit(0 if not json.load(open(sys.argv[1])) else 1)' /tmp/rolixa-queue.json; then
             echo "has_jobs=false" >> "$GITHUB_OUTPUT"
             echo "Queue is empty; no renderer workers will start."
           else
