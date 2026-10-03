@@ -16,11 +16,16 @@ from storage_upload import upload_file
 
 SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
+OFFLINE_MODE = os.environ.get('ROLIXA_OFFLINE_MODE', '0').strip() == '1'
+OFFLINE_BATCH = Path(os.environ.get('ROLIXA_OFFLINE_BATCH', 'config/offline_render_batch.json'))
+OFFLINE_JOBS = json.loads(OFFLINE_BATCH.read_text(encoding='utf-8')).get('jobs', []) if OFFLINE_MODE and OFFLINE_BATCH.exists() else []
 ENGINE = 'motion-first-renderer-v13-scene-qc'
 VOICE_MODEL = os.environ.get('PIPER_VOICE', 'en_US-lessac-medium')
 VOICE_DIR = Path(os.environ.get('PIPER_VOICE_DIR', '.piper-voices'))
-if not SUPABASE_URL or not SERVICE_KEY:
-    raise SystemExit('Supabase secrets required.')
+if not OFFLINE_MODE and (not SUPABASE_URL or not SERVICE_KEY):
+    raise SystemExit('Supabase secrets required for database-backed rendering.')
+if OFFLINE_MODE and not OFFLINE_JOBS:
+    raise SystemExit(f'Offline render mode requested but no jobs were found in {OFFLINE_BATCH}.')
 HEADERS = {
     'apikey': SERVICE_KEY,
     'Authorization': f'Bearer {SERVICE_KEY}',
@@ -30,6 +35,13 @@ W, H = 1080, 1920
 
 
 def request(method, path, data=None, extra=None):
+    if OFFLINE_MODE:
+        if method == 'GET' and '/video_projects?id=eq.' in path:
+            project_id = path.split('/video_projects?id=eq.',1)[1].split('&',1)[0]
+            return [j['project'] for j in OFFLINE_JOBS if j.get('project_id') == project_id]
+        if method == 'GET' and '/visual_assets?' in path:
+            return []
+        return []
     body = None if data is None else json.dumps(data).encode()
     headers = dict(HEADERS)
     headers.update(extra or {})
@@ -100,6 +112,12 @@ def human_check(script, longform=False):
 
 
 def claim():
+    if OFFLINE_MODE:
+        try:
+            worker = max(1, int(os.environ.get('ROLIXA_WORKER', '1')))
+        except ValueError:
+            worker = 1
+        return OFFLINE_JOBS[worker - 1] if worker <= len(OFFLINE_JOBS) else None
     rows = request('POST', '/rest/v1/rpc/claim_next_render_job', {}) or []
     return rows[0] if rows else None
 
@@ -463,6 +481,10 @@ try:
     if str(project.get('style') or '').lower().startswith('blender'):
         out = render_blender_full(project, job, audio, dur, work)
         obj = f"{job['user_id']}/{job['project_id']}/{job['id']}.mp4"
+        if OFFLINE_MODE:
+            stored = upload_file(out, SUPABASE_URL, SERVICE_KEY, 'video-outputs', obj, mime='video/mp4', upsert=True)
+            print(f"Rendered {obj}: offline Supabase-independent Blender output stored in external media backend: {stored}")
+            raise SystemExit(0)
         print(f"Rendered {obj}:")
         raise SystemExit(0)
     sentence_list = sentences(script)
