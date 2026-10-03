@@ -76,7 +76,8 @@ def prepare_shortform(project):
         return project
     step(project, 'script_writer', 'running', 'Writing final spoken Short narration; factual projects require public support, explicitly fictional/story projects do not.')
     try:
-        made = write_shortform(project)
+        existing_sources = req('GET', f"/rest/v1/research_sources?project_id=eq.{project['id']}&select=title,url,claim,verified") or []
+        made = write_shortform(project, existing_sources)
         source = made.get('source')
         if source:
             existing = req('GET', f"/rest/v1/research_sources?project_id=eq.{project['id']}&select=id,url") or []
