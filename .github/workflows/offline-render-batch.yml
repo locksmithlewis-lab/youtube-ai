@@ -77,7 +77,23 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: Register rendered R2 media as publish-ready projects
+      - name: Publish every rendered video directly from R2 and verify public status
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          ROLIXA_OFFLINE_BATCH: config/offline_render_batch.json
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet boto3
+          node scripts/publish_offline_direct.js
+
+      - name: Optional Supabase status registration (non-blocking)
+        continue-on-error: true
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -88,18 +104,5 @@ jobs:
           ROLIXA_OFFLINE_BATCH: config/offline_render_batch.json
           ROLIXA_R2_PRESIGN_SECONDS: '518400'
         run: |
-          set -euo pipefail
           python -m pip install --quiet boto3 requests
           python scripts/register_offline_renders.py
-
-      - name: Publish every rendered video and verify public status
-        env:
-          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          YOUTUBE_TOKEN_ENCRYPTION_KEY: ${{ secrets.YOUTUBE_TOKEN_ENCRYPTION_KEY }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          ROLIXA_OFFLINE_BATCH: config/offline_render_batch.json
-        run: |
-          set -euo pipefail
-          node scripts/publish_offline_batch.js
