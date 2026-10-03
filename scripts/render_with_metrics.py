@@ -120,6 +120,9 @@ def prepare_longform(project):
 
 
 def preflight_queue():
+    if os.environ.get('ROLIXA_OFFLINE_MODE','0').strip() == '1':
+        print('Offline mode: skipping Supabase queue preflight; job comes from the GitHub-managed batch.')
+        return
     jobs = req('GET', '/rest/v1/render_jobs?status=eq.queued&select=id,project_id,user_id&order=created_at.asc&limit=12') or []
     for job in jobs:
         rows = req('GET', f"/rest/v1/video_projects?id=eq.{job['project_id']}&select=*") or []
@@ -246,4 +249,7 @@ obj,project_id,job_id=matches[-1]
 project_for_cta = (req('GET', f'/rest/v1/video_projects?id=eq.{project_id}&select=style') or [{}])[0]
 if not str(project_for_cta.get('style') or '').lower().startswith('blender'):
     ensure_cta(obj, project_id, job_id)
-post_render_qc(project_id,job_id,obj)
+if os.environ.get('ROLIXA_OFFLINE_MODE','0').strip() == '1':
+    print(f'OFFLINE_RENDER_PASS project={project_id} job={job_id} object={obj}')
+else:
+    post_render_qc(project_id,job_id,obj)
