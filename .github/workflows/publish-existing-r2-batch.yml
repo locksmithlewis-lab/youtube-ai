@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: offline-direct-publish
@@ -24,10 +25,12 @@ jobs:
       - name: Obtain short-lived YouTube access
         id: youtube_auth
         env:
-          GITHUB_ACTIONS_TOKEN: ${{ github.token }}
+          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
         run: |
           set -euo pipefail
-          RESPONSE="$(curl -fsS -X POST             -H "Authorization: Bearer $GITHUB_ACTIONS_TOKEN"             -H "X-Rolixa-GitHub-Publisher: 1"             -H "Content-Type: application/json"             https://rolixa-bey56lewis-4041.vercel.app/api/youtube-start)"
+          OIDC_TOKEN="$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=rolixa-youtube-publisher" | python -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
+          RESPONSE="$(curl -fsS -X POST             -H "Authorization: Bearer $OIDC_TOKEN"             -H "X-Rolixa-GitHub-Publisher: 1"             -H "Content-Type: application/json"             https://rolixa-bey56lewis-4041.vercel.app/api/youtube-start)"
           ACCESS_TOKEN="$(python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' <<<"$RESPONSE")"
           test -n "$ACCESS_TOKEN"
           echo "::add-mask::$ACCESS_TOKEN"
