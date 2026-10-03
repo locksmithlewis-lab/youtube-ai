@@ -149,3 +149,5 @@ jobs:
           ROLIXA_R2_PRESIGN_SECONDS: '518400'
           ROLIXA_WORKER: ${{ matrix.worker }}
         run: python scripts/render_with_metrics.py
+
+# Manual queue kick: run the existing renderer against the current queued job.
