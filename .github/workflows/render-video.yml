@@ -15,6 +15,7 @@ on:
       - 'scripts/b2_storage.py'
       - 'scripts/production_guard.py'
       - 'scripts/media_integrity.py'
+      - 'scripts/storage_preflight.py'
       - 'scripts/engagement_overlay.py'
       - '.github/workflows/render-video.yml'
   schedule:
@@ -144,7 +145,7 @@ jobs:
           B2_REGION: ${{ secrets.B2_REGION }}
           ROLIXA_B2_MAX_STORAGE_BYTES: '9000000000'
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          ROLIXA_R2_MAX_STORAGE_BYTES: '9500000000'
+          ROLIXA_R2_MAX_STORAGE_BYTES: '9000000000'
           ROLIXA_R2_PRESIGN_SECONDS: '518400'
           ROLIXA_WORKER: ${{ matrix.worker }}
         run: python scripts/render_with_metrics.py
