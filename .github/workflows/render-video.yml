@@ -99,7 +99,7 @@ jobs:
 
   render:
     needs: [preflight, media-storage-preflight]
-    if: needs.preflight.outputs.available == 'true' && needs.preflight.outputs.has_jobs == 'true' && needs.media-storage-preflight.result == 'success' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    if: needs.preflight.outputs.available == 'true' && needs.media-storage-preflight.result == 'success' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     strategy:
       fail-fast: false
       max-parallel: 1
