@@ -175,7 +175,7 @@ jobs:
           ROLIXA_R2_MAX_STORAGE_BYTES: '9000000000'
           ROLIXA_R2_PRESIGN_SECONDS: '518400'
           ROLIXA_WORKER: ${{ matrix.worker }}
-          ROLIXA_OFFLINE_MODE: '1'
+          ROLIXA_OFFLINE_MODE: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[offline-render]') }}
           ROLIXA_OFFLINE_BATCH: config/offline_render_batch.json
         run: python scripts/render_with_metrics.py
 
