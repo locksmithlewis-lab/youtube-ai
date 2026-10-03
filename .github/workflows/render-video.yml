@@ -120,7 +120,7 @@ jobs:
 
   render:
     needs: [preflight, media-storage-preflight]
-    if: always() && needs.preflight.result == 'success' && needs.media-storage-preflight.result == 'success'
+    if: needs.preflight.result == 'success' && needs.preflight.outputs.available == 'true' && needs.preflight.outputs.has_jobs == 'true' && needs.media-storage-preflight.result == 'success'
     strategy:
       fail-fast: false
       max-parallel: 1
