@@ -1,0 +1,51 @@
+name: Render Queue Watchdog
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Inspect and clean stale render runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          now=$(date +%s)
+          echo "Render queue watchdog: $REPO"
+
+          gh run list --repo "$REPO" --limit 100 --json databaseId,name,status,createdAt,workflowName,headBranch             > /tmp/runs.json
+
+          python - <<'PY'
+          import json, os, subprocess, time
+          repo=os.environ["REPO"]
+          now=time.time()
+          runs=json.load(open("/tmp/runs.json"))
+          watched={"Offline Render Batch","Render queued videos"}
+          stale=[]
+          for r in runs:
+              if r["workflowName"] not in watched:
+                  continue
+              if r["status"] not in {"queued","pending","in_progress"}:
+                  continue
+              created=r.get("createdAt")
+              if not created:
+                  continue
+              # Give GitHub 15 minutes to assign/start a runner.
+              age=now-time.mktime(time.strptime(created[:19], "%Y-%m-%dT%H:%M:%S"))
+              if age > 900:
+                  stale.append(r)
+          for r in stale:
+              print(f"Cancelling stale {r['workflowName']} #{r['databaseId']}")
+              subprocess.run(["gh","run","cancel",str(r["databaseId"]),"-R",repo],check=False)
+          print(f"Watchdog inspected {len(runs)} runs; cancelled {len(stale)} stale render runs.")
+          PY
