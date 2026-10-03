@@ -10,6 +10,8 @@ on:
       - 'scripts/render_with_metrics.py'
       - 'scripts/storage_upload.py'
       - 'scripts/r2_storage.py'
+      - 'scripts/register_offline_renders.py'
+      - 'scripts/publish_offline_batch.js'
       - '.github/workflows/offline-render-batch.yml'
 
 permissions:
@@ -17,7 +19,7 @@ permissions:
 
 concurrency:
   group: offline-render-batch-main
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   media-preflight:
@@ -42,7 +44,7 @@ jobs:
   render:
     needs: media-preflight
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v5
       - name: Install renderer
