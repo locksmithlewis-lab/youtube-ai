@@ -1,3 +1,4 @@
+# Render-fleet trigger marker: keep normal renderer path intact.
 import json
 import math
 import os
