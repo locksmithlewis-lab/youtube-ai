@@ -243,7 +243,7 @@ def render_asset(asset, plan, index, seg, frames, work):
     if asset['media_type'] == 'image':
         image = work / f'image-{index:03}.img'
         if not download(asset['url'], image):
-            return render_asset(local_graphic_asset(plan, index), plan, index, seg, frames, work)
+            raise RuntimeError(f"Could not download image source {asset.get('id')}.")
         try:
             run([
                 'ffmpeg', '-y', '-loop', '1', '-i', str(image), '-t', f'{seg:.3f}',
@@ -251,10 +251,10 @@ def render_asset(asset, plan, index, seg, frames, work):
                 '-crf', '19', '-pix_fmt', 'yuv420p', str(clip),
             ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return clip, asset
-        except Exception:
-            return render_asset(local_graphic_asset(plan, index), plan, index, seg, frames, work)
+        except Exception as exc:
+            raise RuntimeError(f"Could not encode image source {asset.get('id')}: {exc}") from exc
     if not download(asset['url'], src):
-        return render_asset(local_graphic_asset(plan, index), plan, index, seg, frames, work)
+        raise RuntimeError(f"Could not download video source {asset.get('id')}.")
     try:
         run([
             'ffmpeg', '-y', '-stream_loop', '-1', '-ss', '1.0', '-i', str(src), '-t', f'{seg:.3f}',
@@ -262,8 +262,8 @@ def render_asset(asset, plan, index, seg, frames, work):
             '-pix_fmt', 'yuv420p', str(clip),
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return clip, asset
-    except Exception:
-        return render_asset(local_graphic_asset(plan, index), plan, index, seg, frames, work)
+    except Exception as exc:
+        raise RuntimeError(f"Could not encode video source {asset.get('id')}: {exc}") from exc
 
 
 def render_verified_scene(plan, initial_asset, index, seg, frames, work, used, used_providers):
@@ -285,7 +285,12 @@ def render_verified_scene(plan, initial_asset, index, seg, frames, work, used, u
         if candidate_id in seen:
             continue
         seen.add(candidate_id)
-        clip, actual = render_asset(candidate, plan, index, seg, frames, work)
+        try:
+            clip, actual = render_asset(candidate, plan, index, seg, frames, work)
+        except Exception as exc:
+            failures.append({'provider': candidate.get('provider'), 'id': candidate_id, 'error': str(exc)[:240]})
+            attempted.add(candidate_id)
+            continue
         healthy, integrity = is_healthy(clip, black_limit=.45, freeze_limit=1.20)
         if healthy:
             return clip, actual, failures
