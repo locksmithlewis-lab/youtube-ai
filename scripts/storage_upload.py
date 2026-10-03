@@ -251,14 +251,16 @@ def upload_file(path, supabase_url, key, bucket, obj, mime="application/octet-st
                 return r2_upload_file(path, obj, mime=mime, upsert=upsert)
             except Exception as exc:
                 primary_error = exc
-        if b2_configured():
+        if b2_configured() and os.environ.get("ROLIXA_ALLOW_B2_MEDIA", "").strip() == "1":
             try:
                 return b2_upload_file(path, obj, mime=mime)
             except Exception as exc:
                 if primary_error:
                     raise RuntimeError(f"R2 upload failed ({primary_error}); B2 fallback also failed ({exc}).") from exc
                 raise
-        raise RuntimeError("No approved video media backend is available. Supabase Storage is disabled for video-outputs.")
+        if primary_error:
+            raise RuntimeError(f"R2 media upload failed and B2 fallback is disabled by default: {primary_error}") from primary_error
+        raise RuntimeError("No approved external video media backend is available. Configure R2 before rendering; B2 fallback requires explicit ROLIXA_ALLOW_B2_MEDIA=1.")
     if mime == "video/mp4" and bucket == "video-outputs" and path.stat().st_size > VIDEO_BUCKET_SOFT_LIMIT:
         data = _fit_video_bytes(path.read_bytes())
         return upload_bytes(data, supabase_url, key, bucket, obj, mime, upsert)
