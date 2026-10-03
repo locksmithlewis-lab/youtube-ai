@@ -247,7 +247,7 @@ matches=re.findall(r'Rendered\s+([^/\s]+/([^/\s]+)/([^/:\s]+)\.mp4):',text)
 if not matches: raise SystemExit(0)
 obj,project_id,job_id=matches[-1]
 project_for_cta = (req('GET', f'/rest/v1/video_projects?id=eq.{project_id}&select=style') or [{}])[0]
-if not str(project_for_cta.get('style') or '').lower().startswith('blender'):
+if os.environ.get('ROLIXA_OFFLINE_MODE','0').strip() != '1' and not str(project_for_cta.get('style') or '').lower().startswith('blender'):
     ensure_cta(obj, project_id, job_id)
 if os.environ.get('ROLIXA_OFFLINE_MODE','0').strip() == '1':
     print(f'OFFLINE_RENDER_PASS project={project_id} job={job_id} object={obj}')
