@@ -8,9 +8,14 @@ args=sys.argv[sys.argv.index('--')+1:]
 manifest=json.loads(Path(args[0]).read_text(encoding='utf-8')); out=args[1]
 FPS=int(manifest.get('fps',8)); W=int(manifest.get('width',1280)); H=int(manifest.get('height',720))
 scene=bpy.context.scene
-for eng in ('BLENDER_EEVEE_NEXT','BLENDER_EEVEE','BLENDER_WORKBENCH'):
-    try: scene.render.engine=eng; break
-    except (TypeError,ValueError): pass
+# Use CPU Cycles for predictable headless rendering on GitHub-hosted Linux runners.
+# Eevee can abort on runners without a usable OpenGL device/context.
+scene.render.engine = 'CYCLES'
+scene.cycles.device = 'CPU'
+scene.cycles.samples = 8
+scene.cycles.use_denoising = False
+scene.render.threads_mode = 'FIXED'
+scene.render.threads = 2
 scene.render.resolution_x=W; scene.render.resolution_y=H; scene.render.resolution_percentage=100; scene.render.fps=FPS
 scene.render.image_settings.file_format='FFMPEG'; scene.render.ffmpeg.format='MPEG4'; scene.render.ffmpeg.codec='H264'; scene.render.ffmpeg.constant_rate_factor='MEDIUM'; scene.render.filepath=out
 scene.frame_start=1; scene.frame_end=max(2,int(float(manifest['duration'])*FPS)); scene.world.color=(.006,.008,.015)
