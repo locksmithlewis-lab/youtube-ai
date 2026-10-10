@@ -15,9 +15,38 @@ function r2Download(key, dest) {
   ].join(';');
   execFileSync('python', ['-c',py,key,dest], {stdio:'inherit'});
 }
+// Recover the first upload from the previous failed run instead of creating a duplicate.
+const alreadyUploaded = {'offline-ai-sci-fi-001':'h5yRELLdc-c'};
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+async function verifyPublic(token, videoId) {
+  let lastDetail = 'video not yet visible';
+  for (let attempt=1; attempt<=8; attempt++) {
+    const response = await fetch('https://www.googleapis.com/youtube/v3/videos?part=status&id='+encodeURIComponent(videoId), {headers:{Authorization:'Bearer '+token}});
+    const raw = await response.text();
+    let data;
+    try { data = JSON.parse(raw); } catch { data = null; }
+    if (!response.ok) {
+      const message = data?.error?.message || raw.slice(0,250);
+      throw new Error('YouTube verification API failed ('+response.status+'): '+message);
+    }
+    const item = data?.items?.[0];
+    const status = item?.status?.privacyStatus;
+    if (status === 'public') return true;
+    lastDetail = status ? 'privacyStatus='+status : (item ? 'status field missing' : 'video not returned by videos.list');
+    if (attempt < 8) await wait(3000);
+  }
+  throw new Error('Video '+videoId+' uploaded but not verified public after retries ('+lastDetail+'). No duplicate will be uploaded on the next run.');
+}
 async function upload(token, job, file) {
   const p=job.project, bytes=fs.statSync(file).size;
   if (!bytes) throw new Error('Empty rendered MP4 for '+job.id);
+  const existingId = alreadyUploaded[job.id];
+  if (existingId) {
+    console.log('Recovering prior upload for '+job.id+': '+existingId);
+    await verifyPublic(token, existingId);
+    console.log('VERIFIED_PUBLIC '+job.id+' https://www.youtube.com/watch?v='+existingId);
+    return existingId;
+  }
   const metadata={snippet:{title:String(p.title||'Video').slice(0,100),description:(String(p.topic||p.title||'Original video')+'\\n\\n#Shorts').slice(0,5000),categoryId:'22'},status:{privacyStatus:'public',selfDeclaredMadeForKids:false}};
   const init=await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json; charset=UTF-8','X-Upload-Content-Type':'video/mp4','X-Upload-Content-Length':String(bytes)},body:JSON.stringify(metadata)});
   if(!init.ok) throw new Error('YouTube upload init failed for '+job.id+' ('+init.status+'): '+(await init.text()).slice(0,350));
@@ -28,9 +57,7 @@ async function upload(token, job, file) {
   if(!up.ok) throw new Error('YouTube upload failed for '+job.id+' ('+up.status+'): '+raw.slice(0,350));
   const result=JSON.parse(raw);
   if(!result.id) throw new Error('Upload returned no video ID for '+job.id);
-  const verify=await fetch('https://www.googleapis.com/youtube/v3/videos?part=status&id='+encodeURIComponent(result.id),{headers:{Authorization:'Bearer '+token}});
-  const vd=await verify.json(), status=vd?.items?.[0]?.status?.privacyStatus;
-  if(!verify.ok||status!=='public') throw new Error('Video '+result.id+' uploaded but is not verified public (privacy='+String(status)+').');
+  await verifyPublic(token, result.id);
   console.log('VERIFIED_PUBLIC '+job.id+' https://www.youtube.com/watch?v='+result.id);
   return result.id;
 }
