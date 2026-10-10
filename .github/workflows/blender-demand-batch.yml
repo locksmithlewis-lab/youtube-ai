@@ -1,4 +1,5 @@
 name: Blender Demand Batch
+# Blender rendering uses CPU Cycles in headless CI; auth curl continuations are single-backslash shell escapes.
 
 on:
   workflow_dispatch:
