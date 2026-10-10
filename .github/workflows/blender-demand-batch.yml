@@ -46,7 +46,7 @@ jobs:
       - name: Install Blender renderer
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq blender ffmpeg fonts-dejavu-core
+          sudo apt-get install -y -qq blender ffmpeg fonts-dejavu-core xvfb libgl1-mesa-dri libglx-mesa0
           python -m pip install --quiet boto3 piper-tts==1.6.0
       - name: Render five Blender videos sequentially
         env:
