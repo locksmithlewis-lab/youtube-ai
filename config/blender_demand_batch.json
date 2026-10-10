@@ -1,54 +1,189 @@
 {
   "jobs": [
     {
+      "id": "blender-muse-agents-001-render",
       "project_id": "blender-muse-agents-001",
-      "title": "Meta’s AI Agents Are Starting to Feel Like the Future",
-      "topic": "Meta Connect 2026 and the rise of AI agents that can take actions for you",
-      "format": "Full Video",
-      "style": "Blender Technology",
-      "target_duration_seconds": 60,
       "user_id": "offline",
-      "script": "AI assistants used to wait for you to ask a question. The next wave is different. AI agents are being built to understand a goal, break it into steps, use software, and come back with a result. That is why the latest AI hardware and agent announcements matter. Instead of treating AI like a chatbot, imagine giving it a job: research a topic, organize the information, compare the options, and prepare the final answer. The difficult part is not making an impressive demo. It is making an agent reliable enough to act without creating a new problem. That means better planning, permissions, memory, and ways to check its own work. If those pieces keep improving, the computer interface could shift from clicking through menus to describing what you want done. The biggest change may not be a smarter chatbot. It may be a computer that can actually carry out the task."
+      "hashtags": [
+        "#AI",
+        "#AIAgents",
+        "#MetaAI",
+        "#FutureTech",
+        "#ArtificialIntelligence",
+        "#TechNews",
+        "#Automation",
+        "#MachineLearning",
+        "#Rolixa"
+      ],
+      "project": {
+        "id": "blender-muse-agents-001",
+        "user_id": "offline",
+        "title": "Meta’s AI Agents Are Starting to Feel Like the Future",
+        "topic": "Meta Connect 2026 and the rise of AI agents that can take actions for you",
+        "format": "Full Video",
+        "style": "Blender Technology",
+        "target_duration_seconds": 60,
+        "script": "AI assistants used to wait for you to ask a question. The next wave is different. AI agents are being built to understand a goal, break it into steps, use software, and come back with a result. That is why the latest AI hardware and agent announcements matter. Instead of treating AI like a chatbot, imagine giving it a job: research a topic, organize the information, compare the options, and prepare the final answer. The difficult part is not making an impressive demo. It is making an agent reliable enough to act without creating a new problem. That means better planning, permissions, memory, and ways to check its own work. If those pieces keep improving, the computer interface could shift from clicking through menus to describing what you want done. The biggest change may not be a smarter chatbot. It may be a computer that can actually carry out the task.",
+        "hashtags": [
+          "#AI",
+          "#AIAgents",
+          "#MetaAI",
+          "#FutureTech",
+          "#ArtificialIntelligence",
+          "#TechNews",
+          "#Automation",
+          "#MachineLearning",
+          "#Rolixa"
+        ]
+      }
     },
     {
+      "id": "blender-raytracing-002-render",
       "project_id": "blender-raytracing-002",
-      "title": "Why Ray Tracing Can Make a Game Look Worse",
-      "topic": "Gears of War E-Day PC ray tracing discussion and the tradeoff between visual effects and image quality",
-      "format": "Full Video",
-      "style": "Blender Gaming",
-      "target_duration_seconds": 60,
       "user_id": "offline",
-      "script": "Ray tracing is supposed to make games look more realistic. So why can turning it on sometimes make a game look worse? The answer is that realism is not the same thing as image quality. Ray tracing changes how light, reflections, shadows, and surfaces are calculated, but the final picture still depends on resolution, reconstruction, denoising, and frame timing. If a ray traced effect is noisy or unstable, the extra realism can become distracting. Developers then have to balance samples, reconstruction, performance, and visual clarity. This is why two games can both advertise ray tracing and produce completely different results. The most convincing image is usually the result of a whole pipeline working together, not one graphics setting. As modern games push more advanced lighting, the interesting question is no longer whether a game has ray tracing. It is whether the entire rendering pipeline can turn that extra information into a cleaner picture."
+      "hashtags": [
+        "#RayTracing",
+        "#Gaming",
+        "#PCGaming",
+        "#Graphics",
+        "#GameTech",
+        "#UnrealEngine",
+        "#Visuals",
+        "#GamingNews",
+        "#Rolixa"
+      ],
+      "project": {
+        "id": "blender-raytracing-002",
+        "user_id": "offline",
+        "title": "Why Ray Tracing Can Make a Game Look Worse",
+        "topic": "Gears of War E-Day PC ray tracing discussion and the tradeoff between visual effects and image quality",
+        "format": "Full Video",
+        "style": "Blender Gaming",
+        "target_duration_seconds": 60,
+        "script": "Ray tracing is supposed to make games look more realistic. So why can turning it on sometimes make a game look worse? The answer is that realism is not the same thing as image quality. Ray tracing changes how light, reflections, shadows, and surfaces are calculated, but the final picture still depends on resolution, reconstruction, denoising, and frame timing. If a ray traced effect is noisy or unstable, the extra realism can become distracting. Developers then have to balance samples, reconstruction, performance, and visual clarity. This is why two games can both advertise ray tracing and produce completely different results. The most convincing image is usually the result of a whole pipeline working together, not one graphics setting. As modern games push more advanced lighting, the interesting question is no longer whether a game has ray tracing. It is whether the entire rendering pipeline can turn that extra information into a cleaner picture.",
+        "hashtags": [
+          "#RayTracing",
+          "#Gaming",
+          "#PCGaming",
+          "#Graphics",
+          "#GameTech",
+          "#UnrealEngine",
+          "#Visuals",
+          "#GamingNews",
+          "#Rolixa"
+        ]
+      }
     },
     {
+      "id": "blender-witcher-remaster-003-render",
       "project_id": "blender-witcher-remaster-003",
-      "title": "What Actually Changes When a Game Gets Remastered?",
-      "topic": "The Witcher 3 Remastered update and what remaster technology changes under the hood",
-      "format": "Full Video",
-      "style": "Blender Gaming",
-      "target_duration_seconds": 60,
       "user_id": "offline",
-      "script": "A remaster can look like a new game without actually being a new game. The difference comes from what gets rebuilt and what stays underneath. A modern remaster can improve lighting, materials, textures, shadows, geometry, loading, and image reconstruction while keeping the original world and gameplay structure. That creates a strange challenge: change enough to make the game feel modern, but not so much that the original identity disappears. Better lighting can change the mood of an entire scene. Higher quality materials can make old environments feel physically different. And performance upgrades can change how smoothly the world responds. The Witcher 3 is a useful example because its world was already built around strong environmental storytelling. A visual upgrade does not just add detail. It changes what the player notices. The best remasters are therefore less about adding effects and more about deciding which parts of an old game are worth making visible again."
+      "hashtags": [
+        "#TheWitcher3",
+        "#GameRemaster",
+        "#Gaming",
+        "#GameDevelopment",
+        "#Graphics",
+        "#GameDesign",
+        "#PCGaming",
+        "#GamingNews",
+        "#Rolixa"
+      ],
+      "project": {
+        "id": "blender-witcher-remaster-003",
+        "user_id": "offline",
+        "title": "What Actually Changes When a Game Gets Remastered?",
+        "topic": "The Witcher 3 Remastered update and what remaster technology changes under the hood",
+        "format": "Full Video",
+        "style": "Blender Gaming",
+        "target_duration_seconds": 60,
+        "script": "A remaster can look like a new game without actually being a new game. The difference comes from what gets rebuilt and what stays underneath. A modern remaster can improve lighting, materials, textures, shadows, geometry, loading, and image reconstruction while keeping the original world and gameplay structure. That creates a strange challenge: change enough to make the game feel modern, but not so much that the original identity disappears. Better lighting can change the mood of an entire scene. Higher quality materials can make old environments feel physically different. And performance upgrades can change how smoothly the world responds. The Witcher 3 is a useful example because its world was already built around strong environmental storytelling. A visual upgrade does not just add detail. It changes what the player notices. The best remasters are therefore less about adding effects and more about deciding which parts of an old game are worth making visible again.",
+        "hashtags": [
+          "#TheWitcher3",
+          "#GameRemaster",
+          "#Gaming",
+          "#GameDevelopment",
+          "#Graphics",
+          "#GameDesign",
+          "#PCGaming",
+          "#GamingNews",
+          "#Rolixa"
+        ]
+      }
     },
     {
+      "id": "blender-ai-compute-004-render",
       "project_id": "blender-ai-compute-004",
-      "title": "Why AI Companies Are Spending So Much on Compute",
-      "topic": "The enormous infrastructure commitments behind frontier AI models and why compute is becoming the bottleneck",
-      "format": "Full Video",
-      "style": "Blender Data",
-      "target_duration_seconds": 60,
       "user_id": "offline",
-      "script": "The AI race is increasingly becoming a race to build computers. Training and serving frontier models requires enormous amounts of specialized hardware, electricity, networking, cooling, and data center capacity. That is why AI companies can announce huge infrastructure commitments even while the technology itself is changing every few months. More compute can mean larger training runs, more experiments, faster inference, or entirely new capabilities. But spending more does not automatically create a better product. The real challenge is turning expensive hardware into useful intelligence efficiently. Chips need to be utilized, models need to improve, and the systems around them need to deliver value. This creates a new bottleneck for the AI industry: not just algorithms, but physical infrastructure. The companies building the next generation of AI are therefore also building a massive industrial system underneath it. The visible chatbot is only the front end. Behind it is a machine measured in data centers, networks, chips, and power."
+      "hashtags": [
+        "#AICompute",
+        "#ArtificialIntelligence",
+        "#DataCenters",
+        "#GPUs",
+        "#Semiconductors",
+        "#TechBusiness",
+        "#CloudComputing",
+        "#AIInfrastructure",
+        "#Rolixa"
+      ],
+      "project": {
+        "id": "blender-ai-compute-004",
+        "user_id": "offline",
+        "title": "Why AI Companies Are Spending So Much on Compute",
+        "topic": "The enormous infrastructure commitments behind frontier AI models and why compute is becoming the bottleneck",
+        "format": "Full Video",
+        "style": "Blender Data",
+        "target_duration_seconds": 60,
+        "script": "The AI race is increasingly becoming a race to build computers. Training and serving frontier models requires enormous amounts of specialized hardware, electricity, networking, cooling, and data center capacity. That is why AI companies can announce huge infrastructure commitments even while the technology itself is changing every few months. More compute can mean larger training runs, more experiments, faster inference, or entirely new capabilities. But spending more does not automatically create a better product. The real challenge is turning expensive hardware into useful intelligence efficiently. Chips need to be utilized, models need to improve, and the systems around them need to deliver value. This creates a new bottleneck for the AI industry: not just algorithms, but physical infrastructure. The companies building the next generation of AI are therefore also building a massive industrial system underneath it. The visible chatbot is only the front end. Behind it is a machine measured in data centers, networks, chips, and power.",
+        "hashtags": [
+          "#AICompute",
+          "#ArtificialIntelligence",
+          "#DataCenters",
+          "#GPUs",
+          "#Semiconductors",
+          "#TechBusiness",
+          "#CloudComputing",
+          "#AIInfrastructure",
+          "#Rolixa"
+        ]
+      }
     },
     {
+      "id": "blender-personal-ai-005-render",
       "project_id": "blender-personal-ai-005",
-      "title": "The Computer Interface Is About to Change",
-      "topic": "AI agents, multimodal assistants, and the shift from apps and menus toward task-based computing",
-      "format": "Full Video",
-      "style": "Blender Technology",
-      "target_duration_seconds": 60,
       "user_id": "offline",
-      "script": "For decades, using a computer meant learning where everything was. You opened an app, found a menu, clicked a button, and repeated the process. AI is starting to reverse that relationship. Instead of learning the software first, you can describe the result you want and let an intelligent system decide which tools to use. That does not mean traditional apps disappear. It means the interface between you and those apps can become more flexible. An agent could read a document, move information between tools, summarize the result, and ask for approval before taking an important action. The hard part is trust. A useful agent needs permissions, memory, reliable tool use, and a way to recover when something goes wrong. If those pieces improve, the biggest change may be almost invisible. You will still use the same computer, but the computer will feel less like a collection of separate apps and more like one system that understands the job you are trying to accomplish."
+      "hashtags": [
+        "#AIAgents",
+        "#FutureOfComputing",
+        "#PersonalAI",
+        "#Tech",
+        "#Automation",
+        "#ArtificialIntelligence",
+        "#Productivity",
+        "#FutureTech",
+        "#Rolixa"
+      ],
+      "project": {
+        "id": "blender-personal-ai-005",
+        "user_id": "offline",
+        "title": "The Computer Interface Is About to Change",
+        "topic": "AI agents, multimodal assistants, and the shift from apps and menus toward task-based computing",
+        "format": "Full Video",
+        "style": "Blender Technology",
+        "target_duration_seconds": 60,
+        "script": "For decades, using a computer meant learning where everything was. You opened an app, found a menu, clicked a button, and repeated the process. AI is starting to reverse that relationship. Instead of learning the software first, you can describe the result you want and let an intelligent system decide which tools to use. That does not mean traditional apps disappear. It means the interface between you and those apps can become more flexible. An agent could read a document, move information between tools, summarize the result, and ask for approval before taking an important action. The hard part is trust. A useful agent needs permissions, memory, reliable tool use, and a way to recover when something goes wrong. If those pieces improve, the biggest change may be almost invisible. You will still use the same computer, but the computer will feel less like a collection of separate apps and more like one system that understands the job you are trying to accomplish.",
+        "hashtags": [
+          "#AIAgents",
+          "#FutureOfComputing",
+          "#PersonalAI",
+          "#Tech",
+          "#Automation",
+          "#ArtificialIntelligence",
+          "#Productivity",
+          "#FutureTech",
+          "#Rolixa"
+        ]
+      }
     }
   ]
 }
