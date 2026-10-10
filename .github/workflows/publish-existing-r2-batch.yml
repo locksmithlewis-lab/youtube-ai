@@ -53,8 +53,14 @@ jobs:
           fi
           RESPONSE="$(cat "$RESPONSE_FILE")"
           ACCESS_TOKEN="$(python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' <<<"$RESPONSE")"
+          GRANTED_SCOPES="$(python -c 'import json,sys; print(json.load(sys.stdin).get("scope", ""))' <<<"$RESPONSE")"
           test -n "$ACCESS_TOKEN"
           echo "::add-mask::$ACCESS_TOKEN"
+          echo "Google granted OAuth scopes: ${GRANTED_SCOPES:-not returned by token endpoint}"
+          if [[ " $GRANTED_SCOPES " != *" https://www.googleapis.com/auth/youtube.upload "* ]] || [[ " $GRANTED_SCOPES " != *" https://www.googleapis.com/auth/youtube.readonly "* ]]; then
+            echo "OAuth scope check failed: the saved refresh token must grant both youtube.upload and youtube.readonly. Re-authorize both scopes with the same OAuth client, then replace YOUTUBE_REFRESH_TOKEN in GitHub Secrets."
+            exit 1
+          fi
           echo "access_token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
       - name: Publish already-rendered videos and verify public status
         env:
