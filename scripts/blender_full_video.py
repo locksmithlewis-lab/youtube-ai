@@ -8,14 +8,16 @@ args=sys.argv[sys.argv.index('--')+1:]
 manifest=json.loads(Path(args[0]).read_text(encoding='utf-8')); out=args[1]
 FPS=int(manifest.get('fps',8)); W=int(manifest.get('width',1280)); H=int(manifest.get('height',720))
 scene=bpy.context.scene
-# Use CPU Cycles for predictable headless rendering on GitHub-hosted Linux runners.
-# Eevee can abort on runners without a usable OpenGL device/context.
-scene.render.engine = 'CYCLES'
-scene.cycles.device = 'CPU'
-scene.cycles.samples = 8
-scene.cycles.use_denoising = False
+# Eevee is fast enough for a five-video CI batch. The workflow runs Blender
+# inside Xvfb with Mesa software OpenGL, avoiding both GPU dependencies and
+# the multi-hour per-video cost of CPU path tracing.
+scene.render.engine = 'BLENDER_EEVEE_NEXT'
 scene.render.threads_mode = 'FIXED'
 scene.render.threads = 2
+try:
+    scene.eevee.taa_render_samples = 16
+except (AttributeError, TypeError):
+    pass
 scene.render.resolution_x=W; scene.render.resolution_y=H; scene.render.resolution_percentage=100; scene.render.fps=FPS
 scene.render.image_settings.file_format='FFMPEG'; scene.render.ffmpeg.format='MPEG4'; scene.render.ffmpeg.codec='H264'; scene.render.ffmpeg.constant_rate_factor='MEDIUM'; scene.render.filepath=out
 scene.frame_start=1; scene.frame_end=max(2,int(float(manifest['duration'])*FPS)); scene.world.color=(.006,.008,.015)
