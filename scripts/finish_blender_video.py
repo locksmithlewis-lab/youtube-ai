@@ -57,7 +57,7 @@ def main():
              "-f","lavfi","-i","anullsrc=r=48000:cl=stereo","-t","4","-vf",outro_vf,
              "-c:v","libx264","-preset","veryfast","-crf","21","-pix_fmt","yuv420p",
              "-c:a","aac","-b:a","192k","-ar","48000","-ac","2","-shortest",str(outro)])
-        concat.write_text("file '"+str(overlay)+"'\\nfile '"+str(outro)+"'\\n",encoding="utf-8")
+        concat.write_text("file '"+str(overlay)+"'\nfile '"+str(outro)+"'\n",encoding="utf-8")
         run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat),"-c","copy","-movflags","+faststart",str(final)])
         final.replace(src)
     print("BLENDER_FINISH_PASS: animated background hashtags and 4-second Like + Subscribe outro added.")
