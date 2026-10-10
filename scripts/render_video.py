@@ -426,8 +426,7 @@ def render_blender_full(project, job, audio, dur, work):
     }, indent=2), encoding='utf-8')
     visual = work / 'blender-visual.mp4'
     set_step(project, 'visuals', 'running', f'Rendering {scene_count} animated 3D Blender scenes at 6 fps and normalizing to 24 fps for the finished 16:9 video.')
-    run(['blender','--background','--factory-startup','--python','scripts/blender_full_video.py','--',str(manifest),str(visual)],
-        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    run(['blender','--background','--factory-startup','--threads','2','--python','scripts/blender_full_video.py','--',str(manifest),str(visual)])
     if not visual.exists() or visual.stat().st_size < 500000:
         raise RuntimeError('Blender completed without producing a valid full-video MP4.')
     captions = work / 'captions.srt'
