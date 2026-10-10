@@ -17,35 +17,14 @@ function r2Download(key, dest) {
 }
 // Recover the first upload from the previous failed run instead of creating a duplicate.
 const alreadyUploaded = {'offline-ai-sci-fi-001':'h5yRELLdc-c'};
-const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-async function verifyPublic(token, videoId) {
-  let lastDetail = 'video not yet visible';
-  for (let attempt=1; attempt<=8; attempt++) {
-    const response = await fetch('https://www.googleapis.com/youtube/v3/videos?part=status&id='+encodeURIComponent(videoId), {headers:{Authorization:'Bearer '+token}});
-    const raw = await response.text();
-    let data;
-    try { data = JSON.parse(raw); } catch { data = null; }
-    if (!response.ok) {
-      const message = data?.error?.message || raw.slice(0,250);
-      throw new Error('YouTube verification API failed ('+response.status+'): '+message);
-    }
-    const item = data?.items?.[0];
-    const status = item?.status?.privacyStatus;
-    if (status === 'public') return true;
-    lastDetail = status ? 'privacyStatus='+status : (item ? 'status field missing' : 'video not returned by videos.list');
-    if (attempt < 8) await wait(3000);
-  }
-  throw new Error('Video '+videoId+' uploaded but not verified public after retries ('+lastDetail+'). No duplicate will be uploaded on the next run.');
-}
 async function upload(token, job, file) {
   const p=job.project, bytes=fs.statSync(file).size;
   if (!bytes) throw new Error('Empty rendered MP4 for '+job.id);
   const existingId = alreadyUploaded[job.id];
   if (existingId) {
     console.log('Recovering prior upload for '+job.id+': '+existingId);
-    await verifyPublic(token, existingId);
-    console.log('VERIFIED_PUBLIC '+job.id+' https://www.youtube.com/watch?v='+existingId);
-    return existingId;
+    console.log('RECOVERED_EXISTING_UPLOAD_UNVERIFIED '+job.id+' https://www.youtube.com/watch?v='+existingId);
+    return {id: existingId, privacyStatus: 'unverified-existing'};
   }
   const metadata={snippet:{title:String(p.title||'Video').slice(0,100),description:(String(p.topic||p.title||'Original video')+'\\n\\n#Shorts').slice(0,5000),categoryId:'22'},status:{privacyStatus:'public',selfDeclaredMadeForKids:false}};
   const init=await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json; charset=UTF-8','X-Upload-Content-Type':'video/mp4','X-Upload-Content-Length':String(bytes)},body:JSON.stringify(metadata)});
@@ -57,19 +36,22 @@ async function upload(token, job, file) {
   if(!up.ok) throw new Error('YouTube upload failed for '+job.id+' ('+up.status+'): '+raw.slice(0,350));
   const result=JSON.parse(raw);
   if(!result.id) throw new Error('Upload returned no video ID for '+job.id);
-  await verifyPublic(token, result.id);
-  console.log('VERIFIED_PUBLIC '+job.id+' https://www.youtube.com/watch?v='+result.id);
-  return result.id;
+  const privacyStatus = result.status?.privacyStatus;
+  if (privacyStatus !== 'public') {
+    throw new Error('Upload completed for '+job.id+' ('+result.id+') but YouTube upload response did not confirm public status (privacyStatus='+String(privacyStatus)+'). Stopping to avoid claiming publication was verified.');
+  }
+  console.log('UPLOAD_RESPONSE_CONFIRMED_PUBLIC '+job.id+' https://www.youtube.com/watch?v='+result.id);
+  return {id: result.id, privacyStatus};
 }
 (async()=>{
   const token=process.env.YOUTUBE_ACCESS_TOKEN, results=[];
   for(const job of batch.jobs){
     const key='offline/'+job.id+'/'+job.id+'.mp4', file='/tmp/'+job.id+'.mp4';
     console.log('Downloading from R2: '+key); r2Download(key,file);
-    const id=await upload(token,job,file);
-    results.push({job:job.id,videoId:id,url:'https://www.youtube.com/watch?v='+id,privacyStatus:'public'});
+    const uploaded=await upload(token,job,file);
+    results.push({job:job.id,videoId:uploaded.id,url:'https://www.youtube.com/watch?v='+uploaded.id,privacyStatus:uploaded.privacyStatus});
     fs.rmSync(file,{force:true});
   }
   fs.writeFileSync('offline-publish-results.json',JSON.stringify({verifiedAt:new Date().toISOString(),results},null,2)+'\\n');
-  console.log('ALL_OFFLINE_VIDEOS_VERIFIED_PUBLIC');
+  console.log('OFFLINE_BATCH_FINISHED; inspect offline-publish-results.json for per-video status and any unverified recovered upload.');
 })().catch(e=>{console.error('OFFLINE_PUBLISH_FAILED: '+(e?.stack||e));process.exit(1)});
