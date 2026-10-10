@@ -2,6 +2,14 @@ name: Blender Demand Batch
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'config/blender_demand_batch.json'
+      - 'scripts/render_video.py'
+      - 'scripts/finish_blender_video.py'
+      - 'scripts/publish_blender_demand_direct.js'
+      - '.github/workflows/blender-demand-batch.yml'
 
 permissions:
   contents: read
@@ -71,3 +79,10 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           YOUTUBE_ACCESS_TOKEN: ${{ secrets.YOUTUBE_ACCESS_TOKEN }}
         run: node scripts/publish_blender_demand_direct.js
+      - name: Save per-video publication report
+        uses: actions/upload-artifact@v4
+        with:
+          name: blender-publish-results
+          path: blender-publish-results.json
+          if-no-files-found: error
+          retention-days: 14
