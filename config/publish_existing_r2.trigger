@@ -1,1 +1,1 @@
-run existing five rendered R2 videos through verified YouTube publication
+retry existing five rendered R2 videos after adding safe OAuth error diagnostics
