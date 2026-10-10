@@ -444,6 +444,11 @@ def render_blender_full(project, job, audio, dur, work):
     vf="scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24,subtitles="+str(captions).replace('\\','/')+":force_style='FontName=DejaVu Sans,FontSize=22,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&HC0000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginL=190,MarginR=190,MarginV=80'"
     run(['ffmpeg','-y','-i',str(visual),'-i',str(audio),'-vf',vf,'-map','0:v','-map','1:a','-c:v','libx264','-preset','veryfast','-crf','21','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart','-shortest',str(out)],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # Batch videos receive a low-opacity animated hashtag backdrop and a short animated CTA end card.
+    if OFFLINE_MODE:
+        hashtags = project.get('hashtags') or ['#AI', '#Technology', '#Gaming', '#Science', '#Rolixa']
+        run(['python', 'scripts/finish_blender_video.py', str(out), str(project.get('title') or ''), json.dumps(hashtags), str(project.get('topic') or '')],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     healthy, integrity = is_healthy(out, black_limit=.75, freeze_limit=2.0)
     if not healthy:
         raise RuntimeError(f'Blender finished-video integrity failed: black={integrity["max_black_seconds"]:.2f}s freeze={integrity["max_freeze_seconds"]:.2f}s')
