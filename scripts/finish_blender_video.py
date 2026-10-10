@@ -25,21 +25,12 @@ def main():
         tags = ["#AI", "#Technology", "#Gaming", "#Science", "#Rolixa"]
     with tempfile.TemporaryDirectory(prefix="rolixa-finish-") as td:
         root = Path(td)
-        tag_file = root / "hashtags.txt"
-        tag_text = "   ".join(tags[:8])
-        tag_file.write_text(tag_text, encoding="utf-8")
         overlay = root / "overlay.mp4"
         outro = root / "outro.mp4"
         concat = root / "concat.txt"
         final = root / "final.mp4"
-        vf = (
-            f"drawtext=fontfile={FONT}:textfile={tag_file}:reload=0:"
-            "fontcolor=white@0.30:fontsize=34:borderw=1:bordercolor=black@0.15:"
-            "x=(w-text_w)/2+sin(t*0.55)*w*0.24:y=92+sin(t*0.7)*18,"
-            f"drawtext=fontfile={FONT}:textfile={tag_file}:reload=0:"
-            "fontcolor=white@0.20:fontsize=30:borderw=1:bordercolor=black@0.12:"
-            "x=(w-text_w)/2-sin(t*0.43)*w*0.20:y=h-120+cos(t*0.6)*14"
-        )
+        # Hashtags belong in the YouTube description only; do not burn them into the video.
+        vf = "null"
         run(["ffmpeg","-y","-i",str(src),"-vf",vf,"-c:v","libx264","-preset","veryfast","-crf","21",
              "-pix_fmt","yuv420p","-c:a","aac","-b:a","192k","-ar","48000","-ac","2","-movflags","+faststart",str(overlay)])
         outro_vf = (
