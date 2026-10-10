@@ -57,8 +57,8 @@ jobs:
           test -n "$ACCESS_TOKEN"
           echo "::add-mask::$ACCESS_TOKEN"
           echo "Google granted OAuth scopes: ${GRANTED_SCOPES:-not returned by token endpoint}"
-          if [[ " $GRANTED_SCOPES " != *" https://www.googleapis.com/auth/youtube.upload "* ]] || [[ " $GRANTED_SCOPES " != *" https://www.googleapis.com/auth/youtube.readonly "* ]]; then
-            echo "OAuth scope check failed: the saved refresh token must grant both youtube.upload and youtube.readonly. Re-authorize both scopes with the same OAuth client, then replace YOUTUBE_REFRESH_TOKEN in GitHub Secrets."
+          if [[ " $GRANTED_SCOPES " != *" https://www.googleapis.com/auth/youtube.upload "* ]]; then
+            echo "OAuth scope check failed: the saved refresh token must grant youtube.upload. Replace YOUTUBE_REFRESH_TOKEN with a token authorized for the same configured OAuth client."
             exit 1
           fi
           echo "access_token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
