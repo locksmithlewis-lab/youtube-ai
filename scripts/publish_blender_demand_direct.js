@@ -57,15 +57,34 @@ async function upload(token, job, file) {
 
 (async()=>{
   const results=[];
+  const failures=[];
+  const reportPath='blender-publish-results.json';
+  const persist=()=>fs.writeFileSync(reportPath,JSON.stringify({publishedAt:new Date().toISOString(),results,failures},null,2)+'\n');
+  persist();
   for (const job of batch.jobs) {
     const p=job.project||{};
     const key=String(job.user_id||'offline')+'/'+job.project_id+'/'+job.id+'.mp4';
     const file='/tmp/'+job.project_id+'.mp4';
-    console.log('Downloading Blender render from R2: '+key);
-    r2Download(key,file);
-    try { results.push(await upload(process.env.YOUTUBE_ACCESS_TOKEN,job,file)); }
-    finally { fs.rmSync(file,{force:true}); }
+    try {
+      console.log('Downloading Blender render from R2: '+key);
+      r2Download(key,file);
+      const result=await upload(process.env.YOUTUBE_ACCESS_TOKEN,job,file);
+      results.push(result);
+      persist(); // Preserve each confirmed video immediately, even if a later upload fails.
+    } catch (e) {
+      const failure={job:job.project_id,title:p.title||null,error:String(e?.message||e).slice(0,1200)};
+      failures.push(failure);
+      console.error('BLENDER_VIDEO_PUBLISH_FAILED '+job.project_id+': '+failure.error);
+      persist();
+    } finally {
+      fs.rmSync(file,{force:true});
+    }
   }
-  fs.writeFileSync('blender-publish-results.json',JSON.stringify({publishedAt:new Date().toISOString(),results},null,2)+'\n');
-  console.log('BLENDER_BATCH_PUBLISHED: all five upload responses confirmed public. See blender-publish-results.json.');
+  persist();
+  if (failures.length) {
+    console.error('BLENDER_BATCH_PARTIAL_FAILURE: '+results.length+' confirmed public, '+failures.length+' failed. See blender-publish-results.json.');
+    process.exitCode=1;
+  } else {
+    console.log('BLENDER_BATCH_PUBLISHED: all '+results.length+' upload responses confirmed public. See blender-publish-results.json.');
+  }
 })().catch(e=>{console.error('BLENDER_BATCH_PUBLISH_FAILED: '+(e?.stack||e));process.exit(1);});
