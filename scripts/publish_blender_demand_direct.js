@@ -25,16 +25,6 @@ function r2Manifest(action, payload='') {
   const output=execFileSync('python',args,{encoding:'utf8',stdio:['ignore','pipe','inherit']});
   return action==='get'?JSON.parse(output):undefined;
 }
-async function verifyPublic(token,videoId) {
-  const res=await fetch('https://www.googleapis.com/youtube/v3/videos?part=status&id='+encodeURIComponent(videoId),{headers:{Authorization:'Bearer '+token}});
-  const raw=await res.text();
-  if(!res.ok) throw new Error('Could not verify previously published video '+videoId+' ('+res.status+'): '+raw.slice(0,350));
-  const data=JSON.parse(raw);
-  if(!data.items?.length) return false;
-  const status=data.items[0].status?.privacyStatus;
-  if(status!=='public') throw new Error('Existing video '+videoId+' is '+String(status)+'; refusing to upload a duplicate.');
-  return true;
-}
 
 function r2Download(key, dest) {
   const py = [
@@ -97,13 +87,12 @@ async function upload(token, job, file) {
     const file='/tmp/'+job.project_id+'.mp4';
     try {
       const prior=manifest[job.project_id];
-      if(prior?.videoId && await verifyPublic(process.env.YOUTUBE_ACCESS_TOKEN,prior.videoId)){
-        console.log('SKIP_ALREADY_PUBLIC '+job.project_id+' https://www.youtube.com/watch?v='+prior.videoId);
-        results.push({job:job.project_id,videoId:prior.videoId,url:'https://www.youtube.com/watch?v='+prior.videoId,privacyStatus:'public',title:p.title,reused:true});
+      if(prior?.videoId){
+        console.log('SKIP_ALREADY_PUBLISHED '+job.project_id+' https://www.youtube.com/watch?v='+prior.videoId+'; refusing to create a duplicate.');
+        results.push({job:job.project_id,videoId:prior.videoId,url:'https://www.youtube.com/watch?v='+prior.videoId,privacyStatus:prior.privacyStatus||'unverified-existing',title:p.title,reused:true});
         persist();
         continue;
       }
-      if(prior?.videoId){delete manifest[job.project_id];r2Manifest('put',manifest);}
       console.log('Downloading Blender render from R2: '+key);
       r2Download(key,file);
       const result=await upload(process.env.YOUTUBE_ACCESS_TOKEN,job,file);
