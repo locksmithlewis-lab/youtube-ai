@@ -1,5 +1,5 @@
 name: Blender Demand Batch
-# Blender rendering uses CPU Cycles in headless CI; auth curl continuations are single-backslash shell escapes.
+# Blender rendering selects the Eevee engine supported by the installed Blender version; OAuth uses a short-lived token.
 
 on:
   workflow_dispatch:
@@ -8,6 +8,7 @@ on:
     paths:
       - 'config/blender_demand_batch.json'
       - 'scripts/render_video.py'
+      - 'scripts/blender_full_video.py'
       - 'scripts/finish_blender_video.py'
       - 'scripts/publish_blender_demand_direct.js'
       - '.github/workflows/blender-demand-batch.yml'
