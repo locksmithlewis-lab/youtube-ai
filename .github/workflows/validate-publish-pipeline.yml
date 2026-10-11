@@ -61,8 +61,8 @@ jobs:
               print("YAML parsed:", name)
           watchdog = Path(".github/workflows/render-queue-watchdog.yml").read_text(encoding="utf-8")
           start = watchdog.index("python - <<'PY'") + len("python - <<'PY'")
-          end = watchdog.index("\\n          PY", start)
-          source = "\\n".join(line[10:] if line.startswith("          ") else line for line in watchdog[start:end].lstrip("\\n").splitlines())
+          end = watchdog.index("\n          PY", start)
+          source = "\n".join(line[10:] if line.startswith("          ") else line for line in watchdog[start:end].lstrip("\n").splitlines())
           compile(source, ".github/workflows/render-queue-watchdog.yml embedded Python", "exec")
           print("Embedded watchdog Python compiled")
           PY
