@@ -45,8 +45,6 @@ function r2Download(key, dest) {
   ].join(';');
   execFileSync('python', ['-c',py,key,dest], {stdio:'inherit'});
 }
-// Recover the first upload from the previous failed run instead of creating a duplicate.
-const alreadyUploaded = {'offline-ai-sci-fi-001':'h5yRELLdc-c'};
 async function upload(token, job, file) {
   const p=job.project, bytes=fs.statSync(file).size;
   if (!bytes) throw new Error('Empty rendered MP4 for '+job.id);
