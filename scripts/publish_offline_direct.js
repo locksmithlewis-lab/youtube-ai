@@ -60,8 +60,9 @@ async function upload(token, job, file) {
   const reportPath='offline-publish-results.json';
   const persist=()=>fs.writeFileSync(reportPath,JSON.stringify({verifiedAt:new Date().toISOString(),results,failures},null,2)+'\n');
   const manifest=r2Manifest('get');
-  // Preserve the known historical upload, but verify it against YouTube before skipping it.
+  // Preserve the known historical upload ID to avoid creating a duplicate; its public status remains unverified.
   if(!manifest['offline-ai-sci-fi-001']) manifest['offline-ai-sci-fi-001']={videoId:'h5yRELLdc-c',source:'legacy-recovery-candidate',privacyStatus:'unverified-existing'};
+  r2Manifest('put',manifest);
   persist();
   for(const job of batch.jobs){
     const key='offline/'+job.id+'/'+job.id+'.mp4', file='/tmp/'+job.id+'.mp4';
