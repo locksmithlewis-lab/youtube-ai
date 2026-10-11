@@ -11,13 +11,22 @@ scene=bpy.context.scene
 # Eevee is fast enough for a five-video CI batch. The workflow runs Blender
 # inside Xvfb with Mesa software OpenGL, avoiding both GPU dependencies and
 # the multi-hour per-video cost of CPU path tracing.
-scene.render.engine = 'BLENDER_EEVEE_NEXT'
+# Debian/Ubuntu runners currently package Blender 4.0, where Eevee is named BLENDER_EEVEE.
+# Newer Blender releases renamed the engine to BLENDER_EEVEE_NEXT.
+engine_ids = {item.identifier for item in scene.render.bl_rna.properties['engine'].enum_items}
+if 'BLENDER_EEVEE_NEXT' in engine_ids:
+    scene.render.engine = 'BLENDER_EEVEE_NEXT'
+elif 'BLENDER_EEVEE' in engine_ids:
+    scene.render.engine = 'BLENDER_EEVEE'
+else:
+    raise RuntimeError(f'No supported Eevee render engine in Blender {bpy.app.version_string}: {sorted(engine_ids)}')
 scene.render.threads_mode = 'FIXED'
 scene.render.threads = 2
-try:
+# Eevee settings live on different properties across Blender versions.
+if hasattr(scene, 'eevee') and hasattr(scene.eevee, 'taa_render_samples'):
     scene.eevee.taa_render_samples = 16
-except (AttributeError, TypeError):
-    pass
+elif hasattr(scene, 'eevee_next') and hasattr(scene.eevee_next, 'taa_render_samples'):
+    scene.eevee_next.taa_render_samples = 16
 scene.render.resolution_x=W; scene.render.resolution_y=H; scene.render.resolution_percentage=100; scene.render.fps=FPS
 scene.render.image_settings.file_format='FFMPEG'; scene.render.ffmpeg.format='MPEG4'; scene.render.ffmpeg.codec='H264'; scene.render.ffmpeg.constant_rate_factor='MEDIUM'; scene.render.filepath=out
 scene.frame_start=1; scene.frame_end=max(2,int(float(manifest['duration'])*FPS)); scene.world.color=(.006,.008,.015)
