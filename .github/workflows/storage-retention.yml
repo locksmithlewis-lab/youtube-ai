@@ -21,6 +21,7 @@ concurrency:
   group: rolixa-external-media-retention
   cancel-in-progress: true
 
+jobs:
   r2-retention:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -28,14 +29,14 @@ concurrency:
       - uses: actions/checkout@v5
       - name: Install R2 client
         run: python -m pip install --quiet boto3
-      - name: Retain only recent R2 MP4s
+      - name: Retain only recent R2 MP4s (dry run)
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           ROLIXA_R2_RETENTION_DAYS: '2'
-          ROLIXA_R2_RETENTION_DRY_RUN: '0'
+          ROLIXA_R2_RETENTION_DRY_RUN: '1'
         run: python3 scripts/r2_retention.py
 
   b2-retention:
@@ -45,7 +46,7 @@ concurrency:
       - uses: actions/checkout@v5
       - name: Install B2 client
         run: python -m pip install --quiet boto3
-      - name: Retain only recent B2 MP4s
+      - name: Retain only recent B2 MP4s (dry run)
         env:
           B2_ENDPOINT: ${{ secrets.B2_ENDPOINT }}
           B2_ACCESS_KEY_ID: ${{ secrets.B2_ACCESS_KEY_ID }}
@@ -53,5 +54,5 @@ concurrency:
           B2_BUCKET: ${{ secrets.B2_BUCKET }}
           B2_REGION: ${{ secrets.B2_REGION }}
           ROLIXA_B2_RETENTION_DAYS: '2'
-          ROLIXA_B2_RETENTION_DRY_RUN: '0'
+          ROLIXA_B2_RETENTION_DRY_RUN: '1'
         run: python3 scripts/b2_retention.py
