@@ -40,7 +40,6 @@ jobs:
               created=r.get("createdAt")
               if not created:
                   continue
-              # Give GitHub 15 minutes to assign/start a runner; never interrupt an already-running render.
               age=now-time.mktime(time.strptime(created[:19], "%Y-%m-%dT%H:%M:%S"))
               if age > 900:
                   stale.append(r)
@@ -48,20 +47,48 @@ jobs:
               print(f"Cancelling stale {r['workflowName']} #{r['databaseId']}")
               subprocess.run(["gh","run","cancel",str(r["databaseId"]),"-R",repo],check=False)
 
-          # If the offline batch has no active run after cleanup, restart only when
-          # the queue definition has not yet been successfully processed.
-          active=[r for r in runs if r["workflowName"]=="Offline Render Batch"
-                  and r["status"] in {"queued","pending","in_progress"}]
+          # Compare the config FILE SHA at each run's commit, not the file SHA
+          # against a commit SHA. Those are different object types and never match.
           latest_queue=subprocess.check_output(
               ["gh","api",f"repos/{repo}/contents/config/offline_render_batch.json",
                "--jq",".sha"],text=True).strip()
-          completed=subprocess.check_output(
-              ["gh","run","list","-R",repo,"-w","Offline Render Batch","--status","success",
-               "--limit","20","--json","headSha"],text=True)
-          successful={x["headSha"] for x in json.loads(completed)}
-          if not active and latest_queue not in successful:
-              print("No active Offline Render Batch has successfully processed the current queue definition; dispatching a recovery run.")
-              subprocess.run(["gh","workflow","run","Offline Render Batch","-R",repo,"--ref","main"],check=False)
+          offline=[r for r in runs if r.get("workflowName")=="Offline Render Batch"]
+          active=[r for r in offline if r.get("status") in {"queued","pending","in_progress"}]
+          cache={}
+          def queue_sha_at(commit):
+              if commit not in cache:
+                  try:
+                      cache[commit]=subprocess.check_output(
+                          ["gh","api",f"repos/{repo}/contents/config/offline_render_batch.json?ref={commit}",
+                           "--jq",".sha"],text=True,stderr=subprocess.DEVNULL,timeout=15).strip()
+                  except Exception:
+                      cache[commit]=None
+              return cache[commit]
+
+          processed_successfully=False
+          recent_attempt=False
+          for r in offline:
+              commit=r.get("headSha")
+              if not commit or queue_sha_at(commit)!=latest_queue:
+                  continue
+              if r.get("status")=="completed" and r.get("conclusion")=="success":
+                  processed_successfully=True
+                  break
+              created=r.get("createdAt")
+              if created:
+                  age=now-time.mktime(time.strptime(created[:19], "%Y-%m-%dT%H:%M:%S"))
+                  if age < 3600:
+                      recent_attempt=True
+
+          if active:
+              print(f"Watchdog: {len(active)} Offline Render Batch run(s) already active; no duplicate dispatch.")
+          elif processed_successfully:
+              print("Watchdog: current offline queue definition already succeeded; no rerender.")
+          elif recent_attempt:
+              print("Watchdog: current queue had a recent attempt within 60 minutes; cooldown prevents duplicate renders.")
+          else:
+              print("No successful run for current queue definition and no recent attempt; dispatching one recovery run.")
+              subprocess.run(["gh","workflow","run","Offline Render Batch","-R",repo,"--ref","main"],check=True)
 
           print(f"Watchdog inspected {len(runs)} runs; cancelled {len(stale)} stale render runs.")
           PY
