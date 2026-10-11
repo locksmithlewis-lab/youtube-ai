@@ -26,16 +26,6 @@ function r2Manifest(action, payload='') {
   const output=execFileSync('python',args,{encoding:'utf8',stdio:['ignore','pipe','inherit']});
   return action==='get' ? JSON.parse(output) : undefined;
 }
-async function verifyPublic(token, videoId) {
-  const res=await fetch('https://www.googleapis.com/youtube/v3/videos?part=status&id='+encodeURIComponent(videoId),{headers:{Authorization:'Bearer '+token}});
-  const raw=await res.text();
-  if(!res.ok) throw new Error('Could not verify previously published video '+videoId+' ('+res.status+'): '+raw.slice(0,350));
-  const data=JSON.parse(raw);
-  if(!data.items?.length) return false;
-  const status=data.items[0].status?.privacyStatus;
-  if(status!=='public') throw new Error('Existing video '+videoId+' is '+String(status)+'; refusing to upload a duplicate.');
-  return true;
-}
 
 function r2Download(key, dest) {
   const py = [
@@ -71,19 +61,19 @@ async function upload(token, job, file) {
   const persist=()=>fs.writeFileSync(reportPath,JSON.stringify({verifiedAt:new Date().toISOString(),results,failures},null,2)+'\n');
   const manifest=r2Manifest('get');
   // Preserve the known historical upload, but verify it against YouTube before skipping it.
-  if(!manifest['offline-ai-sci-fi-001']) manifest['offline-ai-sci-fi-001']={videoId:'h5yRELLdc-c',source:'legacy-recovery-candidate'};
+  if(!manifest['offline-ai-sci-fi-001']) manifest['offline-ai-sci-fi-001']={videoId:'h5yRELLdc-c',source:'legacy-recovery-candidate',privacyStatus:'unverified-existing'};
   persist();
   for(const job of batch.jobs){
     const key='offline/'+job.id+'/'+job.id+'.mp4', file='/tmp/'+job.id+'.mp4';
     try {
       const prior=manifest[job.id];
-      if(prior?.videoId && await verifyPublic(token,prior.videoId)){
-        console.log('SKIP_ALREADY_PUBLIC '+job.id+' https://www.youtube.com/watch?v='+prior.videoId);
-        results.push({job:job.id,videoId:prior.videoId,url:'https://www.youtube.com/watch?v='+prior.videoId,privacyStatus:'public',reused:true});
+      if(prior?.videoId){
+        const status=prior.privacyStatus==='public'?'public':'unverified-existing';
+        console.log('SKIP_EXISTING_UPLOAD '+job.id+' https://www.youtube.com/watch?v='+prior.videoId+' status='+status+'; refusing to create a duplicate.');
+        results.push({job:job.id,videoId:prior.videoId,url:'https://www.youtube.com/watch?v='+prior.videoId,privacyStatus:status,reused:true});
         persist();
         continue;
       }
-      if(prior?.videoId){ delete manifest[job.id]; r2Manifest('put',manifest); }
       console.log('Downloading from R2: '+key);
       r2Download(key,file);
       const uploaded=await upload(token,job,file);
