@@ -23,7 +23,7 @@ jobs:
           now=$(date +%s)
           echo "Render queue watchdog: $REPO"
 
-          gh run list --repo "$REPO" --limit 100 --json databaseId,name,status,createdAt,workflowName,headBranch             > /tmp/runs.json
+          gh run list --repo "$REPO" --limit 100 --json databaseId,name,status,conclusion,createdAt,workflowName,headBranch,headSha             > /tmp/runs.json
 
           python - <<'PY'
           import json, os, subprocess, time
