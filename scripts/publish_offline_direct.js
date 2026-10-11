@@ -20,7 +20,7 @@ function r2Manifest(action, payload='') {
     '  if e.response.get("Error",{}).get("Code") in ("NoSuchKey","404","NotFound"): print("{}")',
     '  else: raise',
     'else: s.put_object(Bucket=bucket,Key=key,Body=sys.argv[3].encode(),ContentType="application/json",CacheControl="no-store")'
-  ].join('\\n');
+  ].join('\n');
   const args = ['-c',py,action,MANIFEST_KEY];
   if(action==='put') args.push(JSON.stringify(payload));
   const output=execFileSync('python',args,{encoding:'utf8',stdio:['ignore','pipe','inherit']});
@@ -48,7 +48,7 @@ function r2Download(key, dest) {
 async function upload(token, job, file) {
   const p=job.project, bytes=fs.statSync(file).size;
   if (!bytes) throw new Error('Empty rendered MP4 for '+job.id);
-  const metadata={snippet:{title:String(p.title||'Video').slice(0,100),description:(String(p.topic||p.title||'Original video')+'\\n\\n#Shorts').slice(0,5000),categoryId:'22'},status:{privacyStatus:'public',selfDeclaredMadeForKids:false}};
+  const metadata={snippet:{title:String(p.title||'Video').slice(0,100),description:(String(p.topic||p.title||'Original video')+'\n\n#Shorts').slice(0,5000),categoryId:'22'},status:{privacyStatus:'public',selfDeclaredMadeForKids:false}};
   const init=await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json; charset=UTF-8','X-Upload-Content-Type':'video/mp4','X-Upload-Content-Length':String(bytes)},body:JSON.stringify(metadata)});
   if(!init.ok) throw new Error('YouTube upload init failed for '+job.id+' ('+init.status+'): '+(await init.text()).slice(0,350));
   const location=init.headers.get('location');
@@ -68,7 +68,7 @@ async function upload(token, job, file) {
 (async()=>{
   const token=process.env.YOUTUBE_ACCESS_TOKEN, results=[], failures=[];
   const reportPath='offline-publish-results.json';
-  const persist=()=>fs.writeFileSync(reportPath,JSON.stringify({verifiedAt:new Date().toISOString(),results,failures},null,2)+'\\n');
+  const persist=()=>fs.writeFileSync(reportPath,JSON.stringify({verifiedAt:new Date().toISOString(),results,failures},null,2)+'\n');
   const manifest=r2Manifest('get');
   // Preserve the known historical upload, but verify it against YouTube before skipping it.
   if(!manifest['offline-ai-sci-fi-001']) manifest['offline-ai-sci-fi-001']={videoId:'h5yRELLdc-c',source:'legacy-recovery-candidate'};
