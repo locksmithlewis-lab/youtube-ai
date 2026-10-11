@@ -103,7 +103,12 @@ jobs:
           test -n "$ACCESS_TOKEN"
           echo "::add-mask::$ACCESS_TOKEN"
           echo "Google granted OAuth scopes: ${GRANTED_SCOPES:-not returned}"
-          if [[ " $GRANTED_SCOPES " != *" https://www.googleapis.com/auth/youtube.upload "* ]]; then echo "Refresh token lacks youtube.upload scope."; exit 1; fi
+          # Google may omit scope from a refresh response when it is unchanged.
+          # If returned, verify it; otherwise let the upload API report authoritative scope errors.
+          if [ -n "$GRANTED_SCOPES" ] && [[ " $GRANTED_SCOPES " != *" https://www.googleapis.com/auth/youtube.upload "* ]]; then
+            echo "Refresh token response confirms the required youtube.upload scope is missing."
+            exit 1
+          fi
           echo "access_token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
       - name: Publish all five Blender videos to YouTube
         env:
