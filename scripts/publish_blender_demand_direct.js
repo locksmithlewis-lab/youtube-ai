@@ -6,6 +6,26 @@ const batch = JSON.parse(fs.readFileSync(process.env.ROLIXA_OFFLINE_BATCH || 'co
 const required = ['R2_ACCOUNT_ID','R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY','R2_BUCKET','YOUTUBE_ACCESS_TOKEN'];
 for (const key of required) if (!process.env[key]) throw new Error('Missing required GitHub Actions secret/environment variable: ' + key);
 
+const MANIFEST_KEY = 'rolixa/publish-manifests/blender-demand-batch-v1.json';
+function r2Manifest(action, payload='') {
+  const py = [
+    'import os,sys,boto3',
+    'from botocore.exceptions import ClientError',
+    's=boto3.client("s3",endpoint_url="https://"+os.environ["R2_ACCOUNT_ID"]+".r2.cloudflarestorage.com",aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],region_name="auto")',
+    'bucket=os.environ["R2_BUCKET"]; key=sys.argv[2]',
+    'if sys.argv[1]=="get":',
+    ' try: print(s.get_object(Bucket=bucket,Key=key)["Body"].read().decode())',
+    ' except ClientError as e:',
+    '  if e.response.get("Error",{}).get("Code") in ("NoSuchKey","404","NotFound"): print("{}")',
+    '  else: raise',
+    'else: s.put_object(Bucket=bucket,Key=key,Body=sys.argv[3].encode(),ContentType="application/json",CacheControl="no-store")'
+  ].join('\n');
+  const args=['-c',py,action,MANIFEST_KEY];
+  if(action==='put') args.push(JSON.stringify(payload));
+  const output=execFileSync('python',args,{encoding:'utf8',stdio:['ignore','pipe','inherit']});
+  return action==='get'?JSON.parse(output):undefined;
+}
+
 function r2Download(key, dest) {
   const py = [
     'import os,sys,boto3',
@@ -56,22 +76,31 @@ async function upload(token, job, file) {
 }
 
 (async()=>{
-  const results=[];
-  const failures=[];
+  const results=[], failures=[];
   const reportPath='blender-publish-results.json';
   const persist=()=>fs.writeFileSync(reportPath,JSON.stringify({publishedAt:new Date().toISOString(),results,failures},null,2)+'\n');
+  const manifest=r2Manifest('get');
   persist();
-  for (const job of batch.jobs) {
+  for(const job of batch.jobs){
     const p=job.project||{};
     const key=String(job.user_id||'offline')+'/'+job.project_id+'/'+job.id+'.mp4';
     const file='/tmp/'+job.project_id+'.mp4';
     try {
+      const prior=manifest[job.project_id];
+      if(prior?.videoId){
+        console.log('SKIP_ALREADY_PUBLISHED '+job.project_id+' https://www.youtube.com/watch?v='+prior.videoId+'; refusing to create a duplicate.');
+        results.push({job:job.project_id,videoId:prior.videoId,url:'https://www.youtube.com/watch?v='+prior.videoId,privacyStatus:prior.privacyStatus||'unverified-existing',title:p.title,reused:true});
+        persist();
+        continue;
+      }
       console.log('Downloading Blender render from R2: '+key);
       r2Download(key,file);
       const result=await upload(process.env.YOUTUBE_ACCESS_TOKEN,job,file);
       results.push(result);
-      persist(); // Preserve each confirmed video immediately, even if a later upload fails.
-    } catch (e) {
+      manifest[job.project_id]={videoId:result.videoId,privacyStatus:'public',title:p.title||null,publishedAt:new Date().toISOString()};
+      r2Manifest('put',manifest);
+      persist();
+    } catch(e) {
       const failure={job:job.project_id,title:p.title||null,error:String(e?.message||e).slice(0,1200)};
       failures.push(failure);
       console.error('BLENDER_VIDEO_PUBLISH_FAILED '+job.project_id+': '+failure.error);
@@ -81,10 +110,6 @@ async function upload(token, job, file) {
     }
   }
   persist();
-  if (failures.length) {
-    console.error('BLENDER_BATCH_PARTIAL_FAILURE: '+results.length+' confirmed public, '+failures.length+' failed. See blender-publish-results.json.');
-    process.exitCode=1;
-  } else {
-    console.log('BLENDER_BATCH_PUBLISHED: all '+results.length+' upload responses confirmed public. See blender-publish-results.json.');
-  }
+  if(failures.length){console.error('BLENDER_BATCH_PARTIAL_FAILURE: '+results.length+' confirmed public, '+failures.length+' failed. See blender-publish-results.json.');process.exitCode=1;}
+  else console.log('BLENDER_BATCH_PUBLISHED: all '+results.length+' videos confirmed public. See blender-publish-results.json.');
 })().catch(e=>{console.error('BLENDER_BATCH_PUBLISH_FAILED: '+(e?.stack||e));process.exit(1);});

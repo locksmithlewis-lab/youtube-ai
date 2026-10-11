@@ -1,0 +1,68 @@
+name: Validate Publish Pipeline
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/publish_offline_direct.js'
+      - 'scripts/publish_blender_demand_direct.js'
+      - 'config/offline_render_batch.json'
+      - 'config/blender_demand_batch.json'
+      - '.github/workflows/offline-render-batch.yml'
+      - '.github/workflows/blender-demand-batch.yml'
+      - '.github/workflows/render-queue-watchdog.yml'
+      - '.github/workflows/validate-publish-pipeline.yml'
+  push:
+    branches: [fix/watchdog-idempotent-publishing]
+    paths:
+      - 'scripts/publish_offline_direct.js'
+      - 'scripts/publish_blender_demand_direct.js'
+      - 'config/offline_render_batch.json'
+      - 'config/blender_demand_batch.json'
+      - '.github/workflows/offline-render-batch.yml'
+      - '.github/workflows/blender-demand-batch.yml'
+      - '.github/workflows/render-queue-watchdog.yml'
+      - '.github/workflows/validate-publish-pipeline.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          node --check scripts/publish_offline_direct.js
+          node --check scripts/publish_blender_demand_direct.js
+      - name: Validate batch JSON
+        run: |
+          python -m json.tool config/offline_render_batch.json >/dev/null
+          python -m json.tool config/blender_demand_batch.json >/dev/null
+      - name: Parse workflow YAML
+        run: |
+          python -m pip install --quiet PyYAML
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+          files = [
+              ".github/workflows/offline-render-batch.yml",
+              ".github/workflows/blender-demand-batch.yml",
+              ".github/workflows/render-queue-watchdog.yml",
+              ".github/workflows/validate-publish-pipeline.yml",
+          ]
+          for name in files:
+              with Path(name).open(encoding="utf-8") as stream:
+                  yaml.safe_load(stream)
+              print("YAML parsed:", name)
+          watchdog = Path(".github/workflows/render-queue-watchdog.yml").read_text(encoding="utf-8").splitlines()
+          start = next(i for i, line in enumerate(watchdog) if "python - <<'PY'" in line) + 1
+          end = next(i for i in range(start, len(watchdog)) if watchdog[i] == "          PY")
+          source = "\n".join(line[10:] if line.startswith("          ") else line for line in watchdog[start:end])
+          compile(source, ".github/workflows/render-queue-watchdog.yml embedded Python", "exec")
+          print("Embedded watchdog Python compiled")
+          PY
