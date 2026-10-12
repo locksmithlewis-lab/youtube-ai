@@ -77,7 +77,24 @@ def build():
     bpy.ops.object.camera_add(location=(0,-11,4.2)); cam=bpy.context.object; scene.camera=cam; cam.data.lens=44
     for s in manifest.get('scenes',[]):
         start=int(float(s['start'])*FPS)+1; end=min(scene.frame_end,max(start+2,int(float(s['end'])*FPS))); idx=int(s.get('index',0))
-        beat_objects(s); cam.location=(math.sin(idx*.7)*5,-11+min(8,idx*.8),3.5+math.cos(idx)*.8); look(cam,(0,6,1.4)); cam.keyframe_insert('location',frame=start); cam.keyframe_insert('rotation_euler',frame=start)
+        beat_objects(s)
+        # Each beat gets a camera move across its full duration, not a single
+        # keyframe at the beginning. This prevents long static shots when a
+        # manifest has gaps or when the final beat extends to the video end.
+        cam.location=(math.sin(idx*.7)*5,-11+min(8,idx*.8),3.5+math.cos(idx)*.8)
+        look(cam,(0,6,1.4)); cam.keyframe_insert('location',frame=start); cam.keyframe_insert('rotation_euler',frame=start)
+        cam.location.x += 1.1
+        cam.location.y += 1.0
+        cam.location.z += 0.25
+        look(cam,(0.35,6.5,1.5))
+        cam.keyframe_insert('location',frame=end); cam.keyframe_insert('rotation_euler',frame=end)
+    # Guarantee camera movement over the tail even if the final scene ends
+    # before the full narration duration. Use linear interpolation so motion
+    # continues smoothly instead of easing into a multi-second freeze.
+    if cam.animation_data and cam.animation_data.action:
+        for curve in cam.animation_data.action.fcurves:
+            for key in curve.keyframe_points:
+                key.interpolation='LINEAR'
     scene['rolixa_blender_full_video']=True; scene['topic']=manifest.get('topic',''); scene['scenes_json']=json.dumps(manifest.get('scenes',[]))
     bpy.ops.wm.save_as_mainfile(filepath=str(Path(out).with_suffix('.blend')))
     bpy.ops.render.render(animation=True)
