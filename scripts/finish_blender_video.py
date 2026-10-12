@@ -42,6 +42,10 @@ def main():
             "fontsize=78+7*sin(t*4):x=(w-text_w)/2:y=465,"
             f"drawtext=fontfile={FONT}:text='MORE TECH, AI AND GAMING':fontcolor=0x7DE3FF:"
             "fontsize=32:x=(w-text_w)/2:y=590,"
+            // A high-contrast sweep moves every frame. This keeps the 4-second
+            // CTA outro visibly animated instead of looking frozen to FFmpeg QC.
+            "drawbox=x='120+mod(t*450,1500)':y=760:w=300:h=8:color=0x27C8F5@0.95:t=fill,"
+            "drawbox=x='120+mod(t*450,1500)':y=780:w=300:h=3:color=white@0.75:t=fill,"
             "fade=t=in:st=0:d=0.35,fade=t=out:st=3.65:d=0.35"
         )
         run(["ffmpeg","-y","-f","lavfi","-i","color=c=0x07111F:s=1920x1080:r=24:d=4",
