@@ -13,6 +13,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+import time
 
 from production_guard import creative_preflight, instruction_leaks
 
@@ -51,16 +52,34 @@ def request(method, path, data=None, prefer=None):
         headers=headers,
         method=method,
     )
-    try:
-        with urllib.request.urlopen(req, timeout=90) as res:
-            raw = res.read()
-            return json.loads(raw.decode()) if raw else None
-    except urllib.error.HTTPError as exc:
+    for attempt in range(4):
         try:
-            body = exc.read().decode("utf-8", "replace")[:1200]
-        except Exception:
-            body = ""
-        raise RuntimeError(f"HTTP {exc.code}: {body}") from exc
+            with urllib.request.urlopen(req, timeout=45) as res:
+                raw = res.read()
+                return json.loads(raw.decode()) if raw else None
+        except urllib.error.HTTPError as exc:
+            try:
+                body = exc.read().decode("utf-8", "replace")[:1200]
+            except Exception:
+                body = ""
+            # Retry transient server-side failures, but fail fast on client/auth errors.
+            if exc.code < 500 or attempt == 3:
+                raise RuntimeError(f"HTTP {exc.code}: {body}") from exc
+            delay = 3 * (2 ** attempt)
+            print(f"Supabase HTTP {exc.code}; retry {attempt + 1}/3 in {delay}s.", flush=True)
+            time.sleep(delay)
+        except urllib.error.URLError as exc:
+            if attempt == 3:
+                raise RuntimeError(
+                    f"Supabase network/DNS request failed after 4 attempts: {exc}"
+                ) from exc
+            delay = 3 * (2 ** attempt)
+            print(
+                f"Supabase network/DNS request failed ({exc}); retry "
+                f"{attempt + 1}/3 in {delay}s.",
+                flush=True,
+            )
+            time.sleep(delay)
 
 
 def patch(table, row_id, payload):
