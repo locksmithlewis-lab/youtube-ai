@@ -2,85 +2,85 @@
   "version": 1,
   "jobs": [
     {
-      "id": "offline-ai-sci-fi-001",
+      "id": "offline-battery-aging-006",
       "user_id": "offline",
-      "project_id": "offline-ai-sci-fi-001",
+      "project_id": "offline-battery-aging-006",
       "project": {
-        "id": "offline-ai-sci-fi-001",
+        "id": "offline-battery-aging-006",
         "user_id": "offline",
-        "title": "5 AI Tools That Feel Like Sci-Fi",
-        "topic": "Five practical AI tools and workflows that feel like science fiction",
-        "format": "Short",
-        "style": "Hype",
-        "target_duration_seconds": 45,
-        "status": "generating",
-        "script": "What if your computer could stop waiting for instructions and start doing the work? Today, five AI tools make that idea feel surprisingly real. First, an AI coding agent can turn a plain English request into working software. Second, voice tools can turn a rough idea into polished narration. Third, image and video models can create visuals from a sentence. Fourth, local AI can run privately on your own machine. And fifth, automation tools can connect all of those pieces into one workflow. None of this is science fiction anymore. The strange part is how quickly it became normal."
-      }
-    },
-    {
-      "id": "offline-internet-change-002",
-      "user_id": "offline",
-      "project_id": "offline-internet-change-002",
-      "project": {
-        "id": "offline-internet-change-002",
-        "user_id": "offline",
-        "title": "The Internet Is About to Change Again",
-        "topic": "How AI agents, local models, and automation are changing everyday software",
-        "format": "Short",
-        "style": "Tech",
-        "target_duration_seconds": 45,
-        "status": "generating",
-        "script": "The next big change on the internet may not look like a new social network. It may look like software that actually does things for you. AI agents can already take a goal, break it into steps, use tools, and return a result. Local models push another change by keeping more work on your own computer. Put those together with automation, and an app becomes less like a menu and more like a teammate. You stop asking which button to press and start describing what you want done. That shift could change how people use software every day."
-      }
-    },
-    {
-      "id": "offline-games-real-003",
-      "user_id": "offline",
-      "project_id": "offline-games-real-003",
-      "project": {
-        "id": "offline-games-real-003",
-        "user_id": "offline",
-        "title": "Why Games Are Getting More Real",
-        "topic": "The technology pushing game worlds, physics, and NPC behavior forward",
-        "format": "Short",
-        "style": "Gaming",
-        "target_duration_seconds": 45,
-        "status": "generating",
-        "script": "Game graphics are only part of the reason modern games feel more real. The bigger change is what happens underneath the picture. Better physics lets objects react in believable ways. Faster hardware gives developers more room for detailed worlds and complex simulations. Procedural systems can build variety without hand-authoring every possible scene. And smarter character systems can make non-player characters react to what the player actually does. Put those pieces together and a game world starts feeling less like a collection of levels and more like a system. The next leap may come from combining all of them."
-      }
-    },
-    {
-      "id": "offline-timing-science-004",
-      "user_id": "offline",
-      "project_id": "offline-timing-science-004",
-      "project": {
-        "id": "offline-timing-science-004",
-        "user_id": "offline",
-        "title": "The Science Behind Perfect Timing",
-        "topic": "Why tiny timing differences can completely change what we see and hear",
+        "title": "Why Your Phone Battery Gets Worse Every Year",
+        "topic": "How lithium-ion battery chemistry gradually loses capacity with charge cycles, heat, and age",
         "format": "Short",
         "style": "Science",
         "target_duration_seconds": 45,
         "status": "generating",
-        "script": "Why can a tiny timing change make the same moment feel completely different? Your brain constantly combines signals arriving from different senses. When those signals line up, an event can feel immediate and natural. When they drift apart, the same event can feel strange or disconnected. Timing also changes rhythm, attention, and expectation. That is why filmmakers, musicians, athletes, and game designers care about fractions of a second. The interesting part is that perfect timing is rarely about one exact number. It is about keeping many small signals synchronized well enough that your brain experiences them as one event."
+        "script": "Your phone battery can show one hundred percent and still hold less energy than it did when it was new. Most phones use lithium-ion batteries, where ions move between two electrodes as the battery charges and discharges. Over time, side reactions consume some of the materials that store energy, so the battery's maximum capacity slowly shrinks. Heat speeds up that aging, and keeping a battery at very high or very low charge for long periods can add stress. That's why an older phone may need charging earlier in the day. The battery isn't suddenly broken; its chemistry has gradually changed."
       }
     },
     {
-      "id": "offline-personal-ai-005",
+      "id": "offline-gps-offline-007",
       "user_id": "offline",
-      "project_id": "offline-personal-ai-005",
+      "project_id": "offline-gps-offline-007",
       "project": {
-        "id": "offline-personal-ai-005",
+        "id": "offline-gps-offline-007",
         "user_id": "offline",
-        "title": "The Next Generation of Personal AI",
-        "topic": "What changes when an AI assistant can remember, plan, and use tools",
+        "title": "How GPS Works When Your Phone Has No Internet",
+        "topic": "How satellite navigation calculates location and why maps may still need downloaded data",
         "format": "Short",
         "style": "Tech",
         "target_duration_seconds": 45,
         "status": "generating",
-        "script": "A chatbot answers questions. A personal AI could do much more. The difference starts with memory, because an assistant that can remember useful preferences does not need every conversation to begin from zero. Add planning, and it can break a goal into steps instead of waiting for one prompt at a time. Add tools, and it can work with files, calendars, code, websites, or other software. The result is a different kind of assistant: less like a search box and more like a digital operator. The hardest part may not be making it smarter. It may be making it reliable and safe enough to trust."
+        "script": "Your phone can often find its location even when the internet is off. GPS satellites continuously broadcast the time and their positions. Your phone listens to several satellites and compares when each signal arrived, using the tiny timing differences to estimate how far away each satellite is. With enough signals, it calculates a position on Earth. The internet is useful for loading maps, traffic, and search results, but it isn't what makes GPS positioning work. If you download a map in advance, navigation can keep working offline, although live traffic and online searches won't."
+      }
+    },
+    {
+      "id": "offline-deleted-files-008",
+      "user_id": "offline",
+      "project_id": "offline-deleted-files-008",
+      "project": {
+        "id": "offline-deleted-files-008",
+        "user_id": "offline",
+        "title": "What Really Happens When You Delete a File?",
+        "topic": "How file systems mark storage as available and why deleted data can sometimes be recovered",
+        "format": "Short",
+        "style": "Tech",
+        "target_duration_seconds": 45,
+        "status": "generating",
+        "script": "When you delete a file, your computer often doesn't immediately erase every bit of its contents. It usually removes the file's directory entry and marks the storage space as available for reuse. Until that space is overwritten, some data may remain recoverable. But solid-state drives complicate the story: a feature called TRIM can tell the drive which blocks are no longer needed, and the drive may clear them during internal cleanup. That's why deleting a file isn't the same as securely wiping it. If information is sensitive, use a trusted secure-erasure method appropriate for the device."
+      }
+    },
+    {
+      "id": "offline-flight-routes-009",
+      "user_id": "offline",
+      "project_id": "offline-flight-routes-009",
+      "project": {
+        "id": "offline-flight-routes-009",
+        "user_id": "offline",
+        "title": "Why Airplane Routes Look Curved on a Flat Map",
+        "topic": "Why great-circle routes can look bent when Earth's curved surface is projected onto a flat map",
+        "format": "Short",
+        "style": "Science",
+        "target_duration_seconds": 45,
+        "status": "generating",
+        "script": "Look at a world map and some airplane routes seem to take a strange detour toward the north. Often, they're following a shorter path, not a longer one. Earth is roughly spherical, and the shortest route between two points on a sphere follows a great-circle path. When that curved surface is flattened into a map, the route can look bent because the map projection distorts distances and directions. Real flight plans also account for winds, weather, airspace, and safety. So the line you see on a flat screen isn't always the path that looks straight to your eyes."
+      }
+    },
+    {
+      "id": "offline-black-box-010",
+      "user_id": "offline",
+      "project_id": "offline-black-box-010",
+      "project": {
+        "id": "offline-black-box-010",
+        "user_id": "offline",
+        "title": "How an Airplane's Black Box Survives a Crash",
+        "topic": "What flight data and cockpit voice recorders do and how crash-protected recorders are designed",
+        "format": "Short",
+        "style": "Science",
+        "target_duration_seconds": 45,
+        "status": "generating",
+        "script": "An airplane's black box is usually bright orange, not black, because investigators need to find it. Most modern aircraft carry a flight data recorder and a cockpit voice recorder. One records information such as altitude, speed, and control inputs; the other captures cockpit audio. The recording units are built inside protective cases designed to withstand severe impact, heat, and pressure. Underwater locator beacons can help search teams find them after an accident at sea. They don't prevent crashes, but they preserve evidence that helps investigators understand what happened and improve aviation safety."
       }
     }
   ],
-  "batch_revision": 1
+  "batch_revision": 2
 }
