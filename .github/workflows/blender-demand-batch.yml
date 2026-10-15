@@ -7,10 +7,7 @@ on:
     branches: [main]
     paths:
       - 'config/blender_demand_batch.json'
-      - 'scripts/render_video.py'
-      - 'scripts/blender_full_video.py'
-      - 'scripts/finish_blender_video.py'
-      - 'scripts/publish_blender_demand_direct.js'
+      - 'config/blender_demand_batch.json'
       - '.github/workflows/blender-demand-batch.yml'
 
 permissions:
