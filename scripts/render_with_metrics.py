@@ -247,6 +247,25 @@ matches=re.findall(r'Rendered\s+([^/\s]+/([^/\s]+)/([^/:\s]+)\.mp4):',text)
 if not matches: raise SystemExit(0)
 obj,project_id,job_id=matches[-1]
 if os.environ.get('ROLIXA_OFFLINE_MODE','0').strip() == '1':
+    # Offline Blender mode bypasses database-backed QC, so independently validate
+    # the actual local MP4's audio/video streams before declaring a render passed.
+    output_path = Path('render-work') / job_id / 'output.mp4'
+    if not output_path.is_file() or output_path.stat().st_size < 500_000:
+        raise SystemExit(f'OFFLINE_AUDIO_QC_FAIL project={project_id}: final MP4 missing or too small.')
+    probe = subprocess.run(
+        ['ffprobe', '-v', 'error', '-show_entries', 'format=duration:stream=codec_type',
+         '-of', 'json', str(output_path)],
+        capture_output=True, text=True, check=True,
+    )
+    media = json.loads(probe.stdout or '{}')
+    stream_types = {stream.get('codec_type') for stream in media.get('streams', [])}
+    duration = float((media.get('format') or {}).get('duration') or 0)
+    if 'video' not in stream_types or 'audio' not in stream_types or duration < 45:
+        raise SystemExit(
+            f'OFFLINE_AUDIO_QC_FAIL project={project_id}: streams={sorted(stream_types)}, duration={duration:.2f}s.'
+        )
+    print(f'OFFLINE_AUDIO_QC_PASS project={project_id} duration={duration:.2f}s audio_stream=present video_stream=present')
+if os.environ.get('ROLIXA_OFFLINE_MODE','0').strip() == '1':
     print('Offline mode: skipping Supabase CTA lookup.')
 else:
     project_for_cta = (req('GET', f'/rest/v1/video_projects?id=eq.{project_id}&select=style') or [{}])[0]
