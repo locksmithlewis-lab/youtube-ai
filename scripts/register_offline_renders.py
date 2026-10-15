@@ -32,10 +32,18 @@ def main():
     try:
         channels=sb("production_channels?enabled=eq.true&publish_enabled=eq.true&platform=eq.youtube&select=id,user_id,channel_title&order=created_at.asc&limit=1")
     except Exception as exc:
-        if "Supabase 402" in str(exc):
-            print("SUPABASE_RESTRICTED: renders remain safely stored in R2; registration/publishing will resume automatically when the control plane is restored.")
-            print("PENDING_OFFLINE_PUBLISH="+json.dumps([j["id"] for j in jobs]))
-            return 2
+        detail = str(exc).lower()
+        if (
+            "supabase 402" in detail
+            or isinstance(exc, (requests.exceptions.ConnectionError, requests.exceptions.Timeout))
+            or "name resolution" in detail
+            or "failed to resolve" in detail
+            or "getaddrinfo failed" in detail
+        ):
+            print("SUPABASE_UNAVAILABLE: optional database registration skipped; direct R2-to-YouTube publishing is independent.")
+            print("PENDING_REGISTRATION="+json.dumps([j["id"] for j in jobs]))
+            print("DETAIL="+str(exc).splitlines()[0][:300])
+            return 0
         raise
     if not channels: raise RuntimeError("No enabled YouTube production channel is configured.")
     channel=channels[0]
