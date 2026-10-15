@@ -45,7 +45,7 @@ jobs:
             echo "::warning::Supabase hostname/network is unavailable. Skipping only database-backed repair steps; the independent R2 render/publish pipeline remains usable."
           fi
       - name: Reconcile and repair ordered series
-        if: steps.supabase.outputs.available == 'true'
+        if: ${{ steps.supabase.outputs.available == 'true' }}
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -75,5 +75,5 @@ jobs:
           PYTHONPATH: scripts
         run: python scripts/production_watchdog.py
       - name: Report skipped database repairs
-        if: steps.supabase.outputs.available != 'true'
+        if: ${{ steps.supabase.outputs.available != 'true' }}
         run: echo "DATABASE_REPAIRS_SKIPPED: Supabase control plane unavailable; no database state was changed."
