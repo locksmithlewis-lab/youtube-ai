@@ -55,6 +55,14 @@ def lights():
     for loc,en,col in [((-5,-6,8),1100,(.55,.72,1)),((6,5,6),900,(.05,.45,1)),((0,-2,4),450,(1,.18,.04))]:
         bpy.ops.object.light_add(type='AREA',location=loc); l=bpy.context.object; l.data.energy=en; l.data.shape='DISK'; l.data.size=5; l.data.color=col; look(l,(0,6,1))
 
+def attach_preserving_world(obj, parent):
+    # Keep face parts in world position when parenting; otherwise Blender adds
+    # the root translation again and the facial rig can drift away from the head.
+    world_matrix = obj.matrix_world.copy()
+    obj.parent = parent
+    obj.matrix_world = world_matrix
+
+
 def subjects():
     skin=mat('NaturalWarmSkin',(.62,.39,.27),0,.72)
     hair=mat('NaturalDarkHair',(.035,.022,.018),0,.82)
@@ -67,27 +75,27 @@ def subjects():
         x=(i-1.5)*2.1; y=1.1+i*.25; z=1.15
         root=bpy.data.objects.new(f'SUBJECT_{i}',None); bpy.context.collection.objects.link(root)
         bpy.ops.mesh.primitive_cylinder_add(vertices=16,radius=.48,depth=1.5,location=(x,y,z))
-        body=bpy.context.object; body.name=f'SUBJECT_{i}_TORSO'; body.data.materials.append(cyan if i%2==0 else dark); body.parent=root
+        body=bpy.context.object; body.name=f'SUBJECT_{i}_TORSO'; body.data.materials.append(cyan if i%2==0 else dark); attach_preserving_world(body,root)
         bpy.ops.mesh.primitive_uv_sphere_add(segments=24,ring_count=16,radius=.42,location=(x,y,z+1.15))
-        head=bpy.context.object; head.name=f'SUBJECT_{i}_HEAD'; head.scale=(.92,.86,1.08); head.data.materials.append(skin); head.parent=root
+        head=bpy.context.object; head.name=f'SUBJECT_{i}_HEAD'; head.scale=(.92,.86,1.08); head.data.materials.append(skin); attach_preserving_world(head,root)
         # A real face rig: eyes, irises, pupils, brows, nose, mouth, ears and a hair cap.
         bpy.ops.mesh.primitive_uv_sphere_add(segments=20,ring_count=12,radius=.19,location=(x,y,z+1.53))
-        cap=bpy.context.object; cap.name=f'SUBJECT_{i}_HAIR'; cap.scale=(1.75,1.0,1.0); cap.data.materials.append(hair); cap.parent=root
+        cap=bpy.context.object; cap.name=f'SUBJECT_{i}_HAIR'; cap.scale=(1.75,1.0,1.0); cap.data.materials.append(hair); attach_preserving_world(cap,root)
         for side in (-1,1):
             bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=10,radius=.073,location=(x+side*.145,y-.342,z+1.24))
-            ew=bpy.context.object; ew.name=f'SUBJECT_{i}_EYE_WHITE_{side}'; ew.scale=(1.0,.48,.78); ew.data.materials.append(eye_white); ew.parent=root
+            ew=bpy.context.object; ew.name=f'SUBJECT_{i}_EYE_WHITE_{side}'; ew.scale=(1.0,.48,.78); ew.data.materials.append(eye_white); attach_preserving_world(ew,root)
             bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=10,radius=.043,location=(x+side*.145,y-.377,z+1.24))
-            ir=bpy.context.object; ir.name=f'SUBJECT_{i}_IRIS_{side}'; ir.data.materials.append(iris); ir.parent=root
+            ir=bpy.context.object; ir.name=f'SUBJECT_{i}_IRIS_{side}'; ir.data.materials.append(iris); attach_preserving_world(ir,root)
             bpy.ops.mesh.primitive_uv_sphere_add(segments=12,ring_count=8,radius=.024,location=(x+side*.145,y-.397,z+1.24))
-            pu=bpy.context.object; pu.name=f'SUBJECT_{i}_PUPIL_{side}'; pu.data.materials.append(pupil); pu.parent=root
+            pu=bpy.context.object; pu.name=f'SUBJECT_{i}_PUPIL_{side}'; pu.data.materials.append(pupil); attach_preserving_world(pu,root)
             bpy.ops.mesh.primitive_cube_add(size=1,location=(x+side*.145,y-.347,z+1.34))
-            brow=bpy.context.object; brow.name=f'SUBJECT_{i}_BROW_{side}'; brow.scale=(.13,.035,.035); brow.rotation_euler.y=side*-.08; brow.data.materials.append(brows); brow.parent=root
+            brow=bpy.context.object; brow.name=f'SUBJECT_{i}_BROW_{side}'; brow.scale=(.13,.035,.035); brow.rotation_euler.y=side*-.08; brow.data.materials.append(brows); attach_preserving_world(brow,root)
             bpy.ops.mesh.primitive_uv_sphere_add(segments=12,ring_count=8,radius=.095,location=(x+side*.385,y,z+1.15))
-            ear=bpy.context.object; ear.name=f'SUBJECT_{i}_EAR_{side}'; ear.scale=(.55,.42,1.0); ear.data.materials.append(skin); ear.parent=root
+            ear=bpy.context.object; ear.name=f'SUBJECT_{i}_EAR_{side}'; ear.scale=(.55,.42,1.0); ear.data.materials.append(skin); attach_preserving_world(ear,root)
         bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=10,radius=.07,location=(x,y-.386,z+1.13))
-        nose=bpy.context.object; nose.name=f'SUBJECT_{i}_NOSE'; nose.scale=(.72,.65,1.0); nose.data.materials.append(skin); nose.parent=root
+        nose=bpy.context.object; nose.name=f'SUBJECT_{i}_NOSE'; nose.scale=(.72,.65,1.0); nose.data.materials.append(skin); attach_preserving_world(nose,root)
         bpy.ops.mesh.primitive_cube_add(size=1,location=(x,y-.365,z+1.025))
-        lips=bpy.context.object; lips.name=f'SUBJECT_{i}_MOUTH'; lips.scale=(.14,.035,.028); lips.data.materials.append(mouth); lips.parent=root
+        lips=bpy.context.object; lips.name=f'SUBJECT_{i}_MOUTH'; lips.scale=(.14,.035,.028); lips.data.materials.append(mouth); attach_preserving_world(lips,root)
         # Keep the cast near the camera so facial features remain legible, with subtle motion only.
         root.keyframe_insert('location',frame=1)
         root.location.x+=math.sin(i+1)*.45; root.location.y+=.55
