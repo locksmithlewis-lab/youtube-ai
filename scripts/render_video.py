@@ -490,7 +490,14 @@ try:
         run(['python', '-m', 'piper.download_voices', '--download-dir', str(VOICE_DIR), VOICE_MODEL])
 
     audio = expressive_voice(script, work, model, longform)
+    if not audio.is_file() or audio.stat().st_size < 10000:
+        raise RuntimeError('Narration generation produced no usable audio file.')
     dur = duration(audio)
+    if dur < 5:
+        raise RuntimeError(f'Narration audio is unexpectedly short ({dur:.2f}s).')
+    # Mark the voice stage complete as soon as the actual narration file passes basic integrity checks.
+    # Previously Blender returned early before the normal renderer marked this stage passed.
+    set_step(project, 'voice', 'passed', f'Piper narration generated and validated with {VOICE_MODEL}: {dur:.1f}s of audio.')
     if str(project.get('style') or '').lower().startswith('blender'):
         out = render_blender_full(project, job, audio, dur, work)
         obj = f"{job['user_id']}/{job['project_id']}/{job['id']}.mp4"
