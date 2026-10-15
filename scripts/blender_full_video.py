@@ -56,11 +56,43 @@ def lights():
         bpy.ops.object.light_add(type='AREA',location=loc); l=bpy.context.object; l.data.energy=en; l.data.shape='DISK'; l.data.size=5; l.data.color=col; look(l,(0,6,1))
 
 def subjects():
+    skin=mat('NaturalWarmSkin',(.62,.39,.27),0,.72)
+    hair=mat('NaturalDarkHair',(.035,.022,.018),0,.82)
+    eye_white=mat('EyeWhites',(.92,.90,.84),0,.28)
+    iris=mat('BrownIris',(.20,.085,.035),0,.3)
+    pupil=mat('DarkPupils',(.012,.009,.008),0,.2)
+    brows=mat('Eyebrows',(.075,.043,.028),0,.8)
+    mouth=mat('NaturalMouth',(.22,.055,.045),0,.65)
     for i in range(4):
-        x=(i-1.5)*2.1; y=1.5+i*.4; z=1.15; root=bpy.data.objects.new(f'SUBJECT_{i}',None); bpy.context.collection.objects.link(root)
-        bpy.ops.mesh.primitive_cylinder_add(vertices=12,radius=.48,depth=1.5,location=(x,y,z)); body=bpy.context.object; body.data.materials.append(cyan if i%2==0 else dark); body.parent=root
-        bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=8,radius=.42,location=(x,y,z+1.15)); head=bpy.context.object; head.data.materials.append(white); head.parent=root
-        root.keyframe_insert('location',frame=1); root.location.x+=math.sin(i+1)*2; root.location.y+=6+i*.4; root.keyframe_insert('location',frame=scene.frame_end)
+        x=(i-1.5)*2.1; y=1.1+i*.25; z=1.15
+        root=bpy.data.objects.new(f'SUBJECT_{i}',None); bpy.context.collection.objects.link(root)
+        bpy.ops.mesh.primitive_cylinder_add(vertices=16,radius=.48,depth=1.5,location=(x,y,z))
+        body=bpy.context.object; body.name=f'SUBJECT_{i}_TORSO'; body.data.materials.append(cyan if i%2==0 else dark); body.parent=root
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=24,ring_count=16,radius=.42,location=(x,y,z+1.15))
+        head=bpy.context.object; head.name=f'SUBJECT_{i}_HEAD'; head.scale=(.92,.86,1.08); head.data.materials.append(skin); head.parent=root
+        # A real face rig: eyes, irises, pupils, brows, nose, mouth, ears and a hair cap.
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=20,ring_count=12,radius=.19,location=(x,y,z+1.53))
+        cap=bpy.context.object; cap.name=f'SUBJECT_{i}_HAIR'; cap.scale=(1.75,1.0,1.0); cap.data.materials.append(hair); cap.parent=root
+        for side in (-1,1):
+            bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=10,radius=.073,location=(x+side*.145,y-.342,z+1.24))
+            ew=bpy.context.object; ew.name=f'SUBJECT_{i}_EYE_WHITE_{side}'; ew.scale=(1.0,.48,.78); ew.data.materials.append(eye_white); ew.parent=root
+            bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=10,radius=.043,location=(x+side*.145,y-.377,z+1.24))
+            ir=bpy.context.object; ir.name=f'SUBJECT_{i}_IRIS_{side}'; ir.data.materials.append(iris); ir.parent=root
+            bpy.ops.mesh.primitive_uv_sphere_add(segments=12,ring_count=8,radius=.024,location=(x+side*.145,y-.397,z+1.24))
+            pu=bpy.context.object; pu.name=f'SUBJECT_{i}_PUPIL_{side}'; pu.data.materials.append(pupil); pu.parent=root
+            bpy.ops.mesh.primitive_cube_add(size=1,location=(x+side*.145,y-.347,z+1.34))
+            brow=bpy.context.object; brow.name=f'SUBJECT_{i}_BROW_{side}'; brow.scale=(.13,.035,.035); brow.rotation_euler.y=side*-.08; brow.data.materials.append(brows); brow.parent=root
+            bpy.ops.mesh.primitive_uv_sphere_add(segments=12,ring_count=8,radius=.095,location=(x+side*.385,y,z+1.15))
+            ear=bpy.context.object; ear.name=f'SUBJECT_{i}_EAR_{side}'; ear.scale=(.55,.42,1.0); ear.data.materials.append(skin); ear.parent=root
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=10,radius=.07,location=(x,y-.386,z+1.13))
+        nose=bpy.context.object; nose.name=f'SUBJECT_{i}_NOSE'; nose.scale=(.72,.65,1.0); nose.data.materials.append(skin); nose.parent=root
+        bpy.ops.mesh.primitive_cube_add(size=1,location=(x,y-.365,z+1.025))
+        lips=bpy.context.object; lips.name=f'SUBJECT_{i}_MOUTH'; lips.scale=(.14,.035,.028); lips.data.materials.append(mouth); lips.parent=root
+        # Keep the cast near the camera so facial features remain legible, with subtle motion only.
+        root.keyframe_insert('location',frame=1)
+        root.location.x+=math.sin(i+1)*.45; root.location.y+=.55
+        root.keyframe_insert('location',frame=scene.frame_end)
+
 
 def beat_objects(s):
     idx=int(s.get('index',0)); start=int(float(s['start'])*FPS)+1; end=min(scene.frame_end,max(start+2,int(float(s['end'])*FPS)))
@@ -81,13 +113,28 @@ def build():
         # Each beat gets a camera move across its full duration, not a single
         # keyframe at the beginning. This prevents long static shots when a
         # manifest has gaps or when the final beat extends to the video end.
-        cam.location=(math.sin(idx*.7)*5,-11+min(8,idx*.8),3.5+math.cos(idx)*.8)
-        look(cam,(0,6,1.4)); cam.keyframe_insert('location',frame=start); cam.keyframe_insert('rotation_euler',frame=start)
-        cam.location.x += 1.1
-        cam.location.y += 1.0
-        cam.location.z += 0.25
-        look(cam,(0.35,6.5,1.5))
-        cam.keyframe_insert('location',frame=end); cam.keyframe_insert('rotation_euler',frame=end)
+        if idx % 3 == 0:
+            # Recurring face close-ups are intentional, not optional background figures.
+            focus=idx % 4
+            fx=(focus-1.5)*2.1
+            fy=1.1+focus*.25+.25
+            cam.location=(fx+.18,fy-4.4,2.75)
+            cam.data.lens=62
+            look(cam,(fx,fy,2.30))
+            cam.keyframe_insert('location',frame=start); cam.keyframe_insert('rotation_euler',frame=start); cam.data.keyframe_insert('lens',frame=start)
+            cam.location.x+=.32; cam.location.y+=.35
+            cam.data.lens=58
+            look(cam,(fx,fy+.12,2.28))
+            cam.keyframe_insert('location',frame=end); cam.keyframe_insert('rotation_euler',frame=end); cam.data.keyframe_insert('lens',frame=end)
+        else:
+            cam.location=(math.sin(idx*.7)*5,-11+min(8,idx*.8),3.5+math.cos(idx)*.8)
+            cam.data.lens=44
+            look(cam,(0,6,1.4)); cam.keyframe_insert('location',frame=start); cam.keyframe_insert('rotation_euler',frame=start); cam.data.keyframe_insert('lens',frame=start)
+            cam.location.x += 1.1
+            cam.location.y += 1.0
+            cam.location.z += 0.25
+            look(cam,(0.35,6.5,1.5))
+            cam.keyframe_insert('location',frame=end); cam.keyframe_insert('rotation_euler',frame=end); cam.data.keyframe_insert('lens',frame=end)
     # Guarantee camera movement over the tail even if the final scene ends
     # before the full narration duration. Use linear interpolation so motion
     # continues smoothly instead of easing into a multi-second freeze.

@@ -1,8 +1,8 @@
 {
   "jobs": [
     {
-      "id": "blender-muse-agents-001-render",
-      "project_id": "blender-muse-agents-001",
+      "id": "blender-muse-agents-001-v2-render",
+      "project_id": "blender-muse-agents-001-v2",
       "user_id": "offline",
       "hashtags": [
         "#AI",
@@ -16,7 +16,7 @@
         "#Rolixa"
       ],
       "project": {
-        "id": "blender-muse-agents-001",
+        "id": "blender-muse-agents-001-v2",
         "user_id": "offline",
         "title": "Meta’s AI Agents Are Starting to Feel Like the Future",
         "topic": "Meta Connect 2026 and the rise of AI agents that can take actions for you",
@@ -38,8 +38,8 @@
       }
     },
     {
-      "id": "blender-raytracing-002-render",
-      "project_id": "blender-raytracing-002",
+      "id": "blender-raytracing-002-v2-render",
+      "project_id": "blender-raytracing-002-v2",
       "user_id": "offline",
       "hashtags": [
         "#RayTracing",
@@ -53,7 +53,7 @@
         "#Rolixa"
       ],
       "project": {
-        "id": "blender-raytracing-002",
+        "id": "blender-raytracing-002-v2",
         "user_id": "offline",
         "title": "Why Ray Tracing Can Make a Game Look Worse",
         "topic": "Gears of War E-Day PC ray tracing discussion and the tradeoff between visual effects and image quality",
@@ -75,8 +75,8 @@
       }
     },
     {
-      "id": "blender-witcher-remaster-003-render",
-      "project_id": "blender-witcher-remaster-003",
+      "id": "blender-witcher-remaster-003-v2-render",
+      "project_id": "blender-witcher-remaster-003-v2",
       "user_id": "offline",
       "hashtags": [
         "#TheWitcher3",
@@ -90,7 +90,7 @@
         "#Rolixa"
       ],
       "project": {
-        "id": "blender-witcher-remaster-003",
+        "id": "blender-witcher-remaster-003-v2",
         "user_id": "offline",
         "title": "What Actually Changes When a Game Gets Remastered?",
         "topic": "The Witcher 3 Remastered update and what remaster technology changes under the hood",
@@ -112,8 +112,8 @@
       }
     },
     {
-      "id": "blender-ai-compute-004-render",
-      "project_id": "blender-ai-compute-004",
+      "id": "blender-ai-compute-004-v2-render",
+      "project_id": "blender-ai-compute-004-v2",
       "user_id": "offline",
       "hashtags": [
         "#AICompute",
@@ -127,7 +127,7 @@
         "#Rolixa"
       ],
       "project": {
-        "id": "blender-ai-compute-004",
+        "id": "blender-ai-compute-004-v2",
         "user_id": "offline",
         "title": "Why AI Companies Are Spending So Much on Compute",
         "topic": "The enormous infrastructure commitments behind frontier AI models and why compute is becoming the bottleneck",
@@ -149,8 +149,8 @@
       }
     },
     {
-      "id": "blender-personal-ai-005-render",
-      "project_id": "blender-personal-ai-005",
+      "id": "blender-personal-ai-005-v2-render",
+      "project_id": "blender-personal-ai-005-v2",
       "user_id": "offline",
       "hashtags": [
         "#AIAgents",
@@ -164,7 +164,7 @@
         "#Rolixa"
       ],
       "project": {
-        "id": "blender-personal-ai-005",
+        "id": "blender-personal-ai-005-v2",
         "user_id": "offline",
         "title": "The Computer Interface Is About to Change",
         "topic": "AI agents, multimodal assistants, and the shift from apps and menus toward task-based computing",

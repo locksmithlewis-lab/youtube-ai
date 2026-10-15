@@ -35,6 +35,17 @@ function r2Download(key, dest) {
   execFileSync('python', ['-c', py, key, dest], {stdio:'inherit'});
 }
 
+async function verifyPublicVideo(token, videoId) {
+  const response = await fetch('https://www.googleapis.com/youtube/v3/videos?part=status,snippet&id=' + encodeURIComponent(videoId), {
+    headers: {Authorization: 'Bearer ' + token}
+  });
+  if (!response.ok) throw new Error('YouTube publication verification failed for ' + videoId + ' (' + response.status + '): ' + (await response.text()).slice(0, 400));
+  const data = await response.json();
+  const video = data.items?.[0];
+  if (!video) return {exists:false, privacyStatus:null};
+  return {exists:true, privacyStatus:video.status?.privacyStatus || 'unknown', title:video.snippet?.title || ''};
+}
+
 async function upload(token, job, file) {
   const bytes = fs.statSync(file).size;
   if (!bytes) throw new Error('Empty Blender render: ' + job.project_id);
@@ -71,7 +82,9 @@ async function upload(token, job, file) {
   const result = JSON.parse(raw);
   if (!result.id) throw new Error('YouTube upload returned no ID for '+job.project_id);
   if (result.status?.privacyStatus !== 'public') throw new Error('Upload '+result.id+' did not confirm public status.');
-  console.log('BLENDER_UPLOAD_CONFIRMED_PUBLIC '+job.project_id+' https://www.youtube.com/watch?v='+result.id);
+  const verification = await verifyPublicVideo(token, result.id);
+  if (!verification.exists || verification.privacyStatus !== 'public') throw new Error('YouTube API did not independently confirm '+result.id+' is public (status='+verification.privacyStatus+').');
+  console.log('BLENDER_UPLOAD_CONFIRMED_PUBLIC '+job.project_id+' https://www.youtube.com/watch?v='+result.id+' title='+verification.title);
   return {job:job.project_id,videoId:result.id,url:'https://www.youtube.com/watch?v='+result.id,privacyStatus:result.status.privacyStatus,title:p.title};
 }
 
@@ -88,10 +101,16 @@ async function upload(token, job, file) {
     try {
       const prior=manifest[job.project_id];
       if(prior?.videoId){
-        console.log('SKIP_ALREADY_PUBLISHED '+job.project_id+' https://www.youtube.com/watch?v='+prior.videoId+'; refusing to create a duplicate.');
-        results.push({job:job.project_id,videoId:prior.videoId,url:'https://www.youtube.com/watch?v='+prior.videoId,privacyStatus:prior.privacyStatus||'unverified-existing',title:p.title,reused:true});
-        persist();
-        continue;
+        const verification = await verifyPublicVideo(process.env.YOUTUBE_ACCESS_TOKEN, prior.videoId);
+        if (verification.exists && verification.privacyStatus === 'public') {
+          console.log('SKIP_ALREADY_PUBLISHED_AND_VERIFIED_PUBLIC '+job.project_id+' https://www.youtube.com/watch?v='+prior.videoId);
+          results.push({job:job.project_id,videoId:prior.videoId,url:'https://www.youtube.com/watch?v='+prior.videoId,privacyStatus:'public',title:verification.title||p.title,reused:true,verifiedAt:new Date().toISOString()});
+          persist();
+          continue;
+        }
+        console.warn('EXISTING_VIDEO_NOT_PUBLIC_OR_MISSING '+job.project_id+' oldVideoId='+prior.videoId+' status='+verification.privacyStatus+'; uploading replacement instead.');
+        delete manifest[job.project_id];
+        r2Manifest('put',manifest);
       }
       console.log('Downloading Blender render from R2: '+key);
       r2Download(key,file);

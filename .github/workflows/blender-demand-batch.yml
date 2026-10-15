@@ -54,6 +54,7 @@ jobs:
           ROLIXA_OFFLINE_MODE: '1'
           ROLIXA_OFFLINE_BATCH: config/blender_demand_batch.json
           PYTHONPATH: scripts
+          PIPER_VOICE: en_US-ryan-high
           PIPER_VOICE_DIR: .piper-voices
           ROLIXA_VISUAL_CACHE: .rolixa-cache
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
@@ -105,9 +106,13 @@ jobs:
           echo "Google granted OAuth scopes: ${GRANTED_SCOPES:-not returned}"
           # Google may omit scope from a refresh response when it is unchanged.
           # If returned, verify it; otherwise let the upload API report authoritative scope errors.
-          if [ -n "$GRANTED_SCOPES" ] && [[ " $GRANTED_SCOPES " != *" https://www.googleapis.com/auth/youtube.upload "* ]]; then
-            echo "Refresh token response confirms the required youtube.upload scope is missing."
-            exit 1
+          if [ -n "$GRANTED_SCOPES" ]; then
+            for required_scope in "https://www.googleapis.com/auth/youtube.upload" "https://www.googleapis.com/auth/youtube.readonly"; do
+              if [[ " $GRANTED_SCOPES " != *" $required_scope "* ]]; then
+                echo "Refresh token response confirms a required YouTube scope is missing: $required_scope"
+                exit 1
+              fi
+            done
           fi
           echo "access_token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
       - name: Publish all five Blender videos to YouTube

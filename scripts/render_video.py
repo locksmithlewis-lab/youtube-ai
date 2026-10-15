@@ -21,7 +21,7 @@ OFFLINE_MODE = os.environ.get('ROLIXA_OFFLINE_MODE', '0').strip() == '1'
 OFFLINE_BATCH = Path(os.environ.get('ROLIXA_OFFLINE_BATCH', 'config/offline_render_batch.json'))
 OFFLINE_JOBS = json.loads(OFFLINE_BATCH.read_text(encoding='utf-8')).get('jobs', []) if OFFLINE_MODE and OFFLINE_BATCH.exists() else []
 ENGINE = 'motion-first-renderer-v13-scene-qc'
-VOICE_MODEL = os.environ.get('PIPER_VOICE', 'en_US-lessac-medium')
+VOICE_MODEL = os.environ.get('PIPER_VOICE', 'en_US-ryan-high')
 VOICE_DIR = Path(os.environ.get('PIPER_VOICE_DIR', '.piper-voices'))
 if not OFFLINE_MODE and (not SUPABASE_URL or not SERVICE_KEY):
     raise SystemExit('Supabase secrets required for database-backed rendering.')
