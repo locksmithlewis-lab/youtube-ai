@@ -29,22 +29,41 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v5
+      - name: Check Supabase control-plane reachability
+        id: supabase
+        env:
+          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
+        shell: bash
+        run: |
+          set +e
+          code="$(curl --silent --output /dev/null --max-time 12 --write-out '%{http_code}' "${SUPABASE_URL}/rest/v1/" 2>/dev/null)"
+          if [ -n "$code" ] && [ "$code" != "000" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Supabase endpoint responds (HTTP $code); running database-backed quality repairs."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Supabase hostname/network is unavailable. Skipping only database-backed repair steps; the independent R2 render/publish pipeline remains usable."
+          fi
       - name: Reconcile and repair ordered series
+        if: steps.supabase.outputs.available == 'true'
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python scripts/series_controller.py
       - name: Repair safely recoverable non-series failures
+        if: steps.supabase.outputs.available == 'true'
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python scripts/repair_failed.py
       - name: Advance only fully approved videos
+        if: steps.supabase.outputs.available == 'true'
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python scripts/auto_quality.py
       - name: Run production watchdog and recover stuck jobs
+        if: steps.supabase.outputs.available == 'true'
         env:
           SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -55,3 +74,6 @@ jobs:
           ROLIXA_WATCHDOG_FAIL_ON_STALL: '0'
           PYTHONPATH: scripts
         run: python scripts/production_watchdog.py
+      - name: Report skipped database repairs
+        if: steps.supabase.outputs.available != 'true'
+        run: echo "DATABASE_REPAIRS_SKIPPED: Supabase control plane unavailable; no database state was changed."
