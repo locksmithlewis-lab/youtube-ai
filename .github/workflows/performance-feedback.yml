@@ -19,7 +19,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      available: ${{ steps.check.outputs.available }}
+    steps:
+      - name: Check Supabase DNS without failing the workflow
+        id: check
+        shell: bash
+        run: |
+          if python - <<'PY'
+          import socket, sys
+          try:
+              socket.getaddrinfo('uqmnpeovwfzizajheuig.supabase.co', 443)
+          except OSError as exc:
+              print(f'Supabase DNS unavailable: {exc}')
+              sys.exit(1)
+          print('Supabase DNS resolves.')
+          PY
+          then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Supabase-dependent work will be skipped; independent R2 publishing remains available."
+          fi
+
   learn:
+    needs: preflight
+    if: needs.preflight.outputs.available == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
