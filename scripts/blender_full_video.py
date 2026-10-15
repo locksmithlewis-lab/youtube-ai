@@ -94,8 +94,17 @@ def subjects():
             ear=bpy.context.object; ear.name=f'SUBJECT_{i}_EAR_{side}'; ear.scale=(.55,.42,1.0); ear.data.materials.append(skin); attach_preserving_world(ear,root)
         bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=10,radius=.07,location=(x,y-.386,z+1.13))
         nose=bpy.context.object; nose.name=f'SUBJECT_{i}_NOSE'; nose.scale=(.72,.65,1.0); nose.data.materials.append(skin); attach_preserving_world(nose,root)
-        bpy.ops.mesh.primitive_cube_add(size=1,location=(x,y-.365,z+1.025))
+        bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=10,radius=1,location=(x,y-.386,z+1.025))
         lips=bpy.context.object; lips.name=f'SUBJECT_{i}_MOUTH'; lips.scale=(.14,.035,.028); lips.data.materials.append(mouth); attach_preserving_world(lips,root)
+        # Speech-like mouth motion during narration. This is animated dialogue motion, not phoneme-accurate lip sync.
+        base_scale=lips.scale.copy()
+        for frame in range(1, scene.frame_end + 1, max(2, int(FPS*.12))):
+            phase=(frame/ max(1,FPS))* (4.2 + i*.17) + i*.8
+            opening=.65 + .95*abs(math.sin(phase))
+            lips.scale=(base_scale.x,base_scale.y,base_scale.z*opening)
+            lips.keyframe_insert(data_path='scale',frame=frame)
+        lips.scale=(base_scale.x,base_scale.y,base_scale.z*.65)
+        lips.keyframe_insert(data_path='scale',frame=scene.frame_end)
         # Keep the cast near the camera so facial features remain legible, with subtle motion only.
         root.keyframe_insert('location',frame=1)
         root.location.x+=math.sin(i+1)*.45; root.location.y+=.55
