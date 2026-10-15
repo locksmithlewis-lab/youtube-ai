@@ -13,7 +13,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      available: ${{ steps.backend.outputs.available }}
+    steps:
+      - name: Check Supabase backend availability
+        id: backend
+        env:
+          SUPABASE_URL: https://uqmnpeovwfzizajheuig.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        shell: bash
+        run: |
+          set +e
+          code=$(curl --silent --output /dev/null --max-time 12 --write-out '%{http_code}' "$SUPABASE_URL/rest/v1/" 2>/dev/null || true)
+          if [ -n "$code" ] && [ "$code" != "000" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Supabase endpoint responded with HTTP $code."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Supabase DNS/network unavailable; stream queue discovery skipped."
+          fi
+
   watch:
+    needs: preflight
+    if: ${{ needs.preflight.outputs.available == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
