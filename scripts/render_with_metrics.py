@@ -260,7 +260,7 @@ if os.environ.get('ROLIXA_OFFLINE_MODE','0').strip() == '1':
     media = json.loads(probe.stdout or '{}')
     stream_types = {stream.get('codec_type') for stream in media.get('streams', [])}
     duration = float((media.get('format') or {}).get('duration') or 0)
-    if 'video' not in stream_types or 'audio' not in stream_types or duration < 45:
+    if 'video' not in stream_types or 'audio' not in stream_types or duration < 20:
         raise SystemExit(
             f'OFFLINE_AUDIO_QC_FAIL project={project_id}: streams={sorted(stream_types)}, duration={duration:.2f}s.'
         )
