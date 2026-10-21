@@ -2,85 +2,85 @@
   "version": 1,
   "jobs": [
     {
-      "id": "offline-battery-aging-006",
+      "id": "offline-qr-codes-011",
       "user_id": "offline",
-      "project_id": "offline-battery-aging-006",
+      "project_id": "offline-qr-codes-011",
       "project": {
-        "id": "offline-battery-aging-006",
+        "id": "offline-qr-codes-011",
         "user_id": "offline",
-        "title": "Why Your Phone Battery Gets Worse Every Year",
-        "topic": "How lithium-ion battery chemistry gradually loses capacity with charge cycles, heat, and age",
-        "format": "Short",
-        "style": "Science",
-        "target_duration_seconds": 45,
-        "status": "generating",
-        "script": "Your phone battery can show one hundred percent and still hold less energy than it did when it was new. Most phones use lithium-ion batteries, where ions move between two electrodes as the battery charges and discharges. Over time, side reactions consume some of the materials that store energy, so the battery's maximum capacity slowly shrinks. Heat speeds up that aging, and keeping a battery at very high or very low charge for long periods can add stress. That's why an older phone may need charging earlier in the day. The battery isn't suddenly broken; its chemistry has gradually changed."
-      }
-    },
-    {
-      "id": "offline-gps-offline-007",
-      "user_id": "offline",
-      "project_id": "offline-gps-offline-007",
-      "project": {
-        "id": "offline-gps-offline-007",
-        "user_id": "offline",
-        "title": "How GPS Works When Your Phone Has No Internet",
-        "topic": "How satellite navigation calculates location and why maps may still need downloaded data",
+        "title": "How QR Codes Store So Much Information",
+        "topic": "How QR codes encode data in a grid of dark and light squares and use error correction",
         "format": "Short",
         "style": "Tech",
-        "target_duration_seconds": 45,
+        "target_duration_seconds": 35,
         "status": "generating",
-        "script": "Your phone can often find its location even when the internet is off. GPS satellites continuously broadcast the time and their positions. Your phone listens to several satellites and compares when each signal arrived, using the tiny timing differences to estimate how far away each satellite is. With enough signals, it calculates a position on Earth. The internet is useful for loading maps, traffic, and search results, but it isn't what makes GPS positioning work. If you download a map in advance, navigation can keep working offline, although live traffic and online searches won't."
+        "script": "A QR code is more than a random pattern of squares. Its grid represents data using black and white modules, with special markers that help your camera detect the code's position and orientation. The pattern can encode text, website links, and other information. QR codes also include error correction, so a code may still scan even if part of it is dirty or damaged. Your phone reads the pattern, decodes the data, and then opens the link or displays the stored information."
       }
     },
     {
-      "id": "offline-deleted-files-008",
+      "id": "offline-noise-cancelling-012",
       "user_id": "offline",
-      "project_id": "offline-deleted-files-008",
+      "project_id": "offline-noise-cancelling-012",
       "project": {
-        "id": "offline-deleted-files-008",
+        "id": "offline-noise-cancelling-012",
         "user_id": "offline",
-        "title": "What Really Happens When You Delete a File?",
-        "topic": "How file systems mark storage as available and why deleted data can sometimes be recovered",
-        "format": "Short",
-        "style": "Tech",
-        "target_duration_seconds": 45,
-        "status": "generating",
-        "script": "When you delete a file, your computer often doesn't immediately erase every bit of its contents. It usually removes the file's directory entry and marks the storage space as available for reuse. Until that space is overwritten, some data may remain recoverable. But solid-state drives complicate the story: a feature called TRIM can tell the drive which blocks are no longer needed, and the drive may clear them during internal cleanup. That's why deleting a file isn't the same as securely wiping it. If information is sensitive, use a trusted secure-erasure method appropriate for the device."
-      }
-    },
-    {
-      "id": "offline-flight-routes-009",
-      "user_id": "offline",
-      "project_id": "offline-flight-routes-009",
-      "project": {
-        "id": "offline-flight-routes-009",
-        "user_id": "offline",
-        "title": "Why Airplane Routes Look Curved on a Flat Map",
-        "topic": "Why great-circle routes can look bent when Earth's curved surface is projected onto a flat map",
+        "title": "How Noise-Cancelling Headphones Silence Noise",
+        "topic": "How active noise cancellation uses microphones and opposing sound waves to reduce steady background noise",
         "format": "Short",
         "style": "Science",
-        "target_duration_seconds": 45,
+        "target_duration_seconds": 35,
         "status": "generating",
-        "script": "Look at a world map and some airplane routes seem to take a strange detour toward the north. Often, they're following a shorter path, not a longer one. Earth is roughly spherical, and the shortest route between two points on a sphere follows a great-circle path. When that curved surface is flattened into a map, the route can look bent because the map projection distorts distances and directions. Real flight plans also account for winds, weather, airspace, and safety. So the line you see on a flat screen isn't always the path that looks straight to your eyes."
+        "script": "Noise-cancelling headphones don't simply block sound with thick padding. Tiny microphones listen to surrounding noise, and the headphones create another sound wave designed to oppose it. When the waves meet, they can partially cancel each other out. This works especially well for steady low sounds, like an airplane engine or air conditioner. Sudden voices and sharp noises are harder to remove because they change quickly. The headphones combine this active system with physical ear cups to make your surroundings quieter."
       }
     },
     {
-      "id": "offline-black-box-010",
+      "id": "offline-ocean-blue-013",
       "user_id": "offline",
-      "project_id": "offline-black-box-010",
+      "project_id": "offline-ocean-blue-013",
       "project": {
-        "id": "offline-black-box-010",
+        "id": "offline-ocean-blue-013",
         "user_id": "offline",
-        "title": "How an Airplane's Black Box Survives a Crash",
-        "topic": "What flight data and cockpit voice recorders do and how crash-protected recorders are designed",
+        "title": "Why the Ocean Looks Blue",
+        "topic": "How water absorbs longer wavelengths of visible light more strongly and scatters blue light",
         "format": "Short",
         "style": "Science",
-        "target_duration_seconds": 45,
+        "target_duration_seconds": 35,
         "status": "generating",
-        "script": "An airplane's black box is usually bright orange, not black, because investigators need to find it. Most modern aircraft carry a flight data recorder and a cockpit voice recorder. One records information such as altitude, speed, and control inputs; the other captures cockpit audio. The recording units are built inside protective cases designed to withstand severe impact, heat, and pressure. Underwater locator beacons can help search teams find them after an accident at sea. They don't prevent crashes, but they preserve evidence that helps investigators understand what happened and improve aviation safety."
+        "script": "The ocean isn't blue just because it reflects the sky. Water absorbs red and orange wavelengths more strongly, while some blue light travels farther and scatters back toward your eyes. That gives deep, clear water its blue appearance. The exact color changes with depth, particles, algae, and the angle of the sunlight. Shallow water can look turquoise because light reflects off sand and the seabed. So the ocean's color comes from how light interacts with water and everything suspended or sitting beneath it."
+      }
+    },
+    {
+      "id": "offline-time-black-holes-014",
+      "user_id": "offline",
+      "project_id": "offline-time-black-holes-014",
+      "project": {
+        "id": "offline-time-black-holes-014",
+        "user_id": "offline",
+        "title": "Why Time Runs Differently Near a Black Hole",
+        "topic": "How gravity affects the passage of time according to general relativity",
+        "format": "Short",
+        "style": "Science",
+        "target_duration_seconds": 35,
+        "status": "generating",
+        "script": "Near a black hole, time can pass more slowly compared with time far away. Einstein's theory of general relativity predicts that gravity affects the passage of time, and extremely strong gravity makes the difference dramatic. To someone watching from far away, a clock closer to the black hole appears to tick more slowly. But a person beside that clock would experience their own time normally. The effect depends on the observer and the gravitational environment; it's not that the nearby person feels time stop."
+      }
+    },
+    {
+      "id": "offline-aircraft-fuel-015",
+      "user_id": "offline",
+      "project_id": "offline-aircraft-fuel-015",
+      "project": {
+        "id": "offline-aircraft-fuel-015",
+        "user_id": "offline",
+        "title": "Why Some Airplanes Dump Fuel Before Landing",
+        "topic": "Why certain large aircraft may jettison fuel in an emergency to reach a safe landing weight",
+        "format": "Short",
+        "style": "Science",
+        "target_duration_seconds": 35,
+        "status": "generating",
+        "script": "Why would an airplane ever release fuel into the air? Some large aircraft can weigh too much to land immediately after takeoff, especially if an emergency forces them to return. Their maximum takeoff weight can be higher than their recommended landing weight. When conditions require it, a crew may jettison fuel to reduce weight before landing. Not every aircraft can do this, and crews may instead land overweight when that is safer. Fuel dumping is an unusual safety procedure, not a normal part of every flight."
       }
     }
   ],
-  "batch_revision": 2
+  "batch_revision": 3
 }
