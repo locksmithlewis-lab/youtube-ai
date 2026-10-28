@@ -578,19 +578,28 @@ try:
         if longform else
         "FontName=DejaVu Sans,FontSize=27,Bold=1,PrimaryColour=&H00FFFFFF,OutlineColour=&HC0000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginL=130,MarginR=130,MarginV=330"
     )
-    vf = final_motion_filter() + f",subtitles={captions}:force_style='{style}'"
+    # Scene concatenation can leave a small tail gap because individual H.264 clips
+    # have frame-boundary rounding. Pad only that tail with the final frame; do not
+    # use -shortest, which silently truncates the finished video to the shorter stream.
+    vf = final_motion_filter() + ",tpad=stop_mode=clone:stop_duration=2" + f",subtitles={captions}:force_style='{style}'"
     run([
         'ffmpeg', '-y', '-i', str(visual), '-i', str(audio), '-vf', vf,
-        '-map', '0:v', '-map', '1:a', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19',
-        '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-shortest', str(out),
+        '-map', '0:v', '-map', '1:a', '-t', f'{dur:.3f}',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19',
+        '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', str(out),
     ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     run(['ffmpeg', '-v', 'error', '-i', str(out), '-f', 'null', '-'], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
     if out.stat().st_size < (3000000 if longform else 500000):
         raise RuntimeError('Output failed file-size validation.')
     final_dur = duration(out)
+    print(f'RENDER_DURATION_QC narration={dur:.3f}s visual={duration(visual):.3f}s final={final_dur:.3f}s minimum={dur * .94:.3f}s')
     if final_dur < dur * .94:
-        raise RuntimeError('Output duration validation failed; edit appears truncated.')
+        raise RuntimeError(
+            f'Output duration validation failed; edit appears truncated '
+            f'(narration={dur:.2f}s, visual={duration(visual):.2f}s, final={final_dur:.2f}s, '
+            f'minimum={dur * .94:.2f}s).'
+        )
     healthy, integrity = is_healthy(out, black_limit=.55, freeze_limit=1.35)
     if not healthy:
         raise RuntimeError(
